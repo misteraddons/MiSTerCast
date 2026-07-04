@@ -78,7 +78,8 @@ namespace MiSTerCast
             if (isStreaming)
                 MiSTerCastInterop.StopStream();
             MiSTerCastInterop.Shutdown();
-            helpWindow.Close();
+            if (helpWindow != null)
+                helpWindow.Close();
         }
 
         private void Window_Closed(object sender, EventArgs e)
@@ -170,7 +171,15 @@ namespace MiSTerCast
                     {
                         try
                         {
-                            ipAddress = Dns.GetHostEntry(TargetIpAddresTextBox.Text).AddressList[0];
+                            var hostEntry = Dns.GetHostEntry(TargetIpAddresTextBox.Text);
+                            if (hostEntry.AddressList == null || hostEntry.AddressList.Length == 0)
+                            {
+                                Log("No IP addresses found for hostname: " + TargetIpAddresTextBox.Text, true);
+                                return;
+                            }
+                            // Prefer IPv4 addresses
+                            ipAddress = hostEntry.AddressList.FirstOrDefault(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                                ?? hostEntry.AddressList[0];
                         }
                         catch (Exception exception)
                         {
@@ -290,37 +299,57 @@ namespace MiSTerCast
 
         private void LoadSaveFileFromStream(StreamReader sr)
         {
-            int settingsVersion = int.Parse(sr.ReadLine());
-            if (settingsVersion > SettingsVersion)
+            try
             {
-                Log("Unsupported save file version: " + settingsVersion, true);
-                return;
+                int settingsVersion;
+                if (!int.TryParse(sr.ReadLine(), out settingsVersion))
+                {
+                    Log("Invalid settings file format.", true);
+                    return;
+                }
+                if (settingsVersion > SettingsVersion)
+                {
+                    Log("Unsupported save file version: " + settingsVersion, true);
+                    return;
+                }
+
+                TargetIpAddresTextBox.Text = sr.ReadLine() ?? "";
+
+                int modelineIndex;
+                if (int.TryParse(sr.ReadLine(), out modelineIndex))
+                    ModelinePresetsBox.SelectedIndex = Math.Min(modelineIndex, ModelinePresetsBox.Items.Count - 1);
+
+                pclockTextBox.Text = sr.ReadLine() ?? "";
+                hactiveTextBox.Text = sr.ReadLine() ?? "";
+                hbeginTextBox.Text = sr.ReadLine() ?? "";
+                hendTextBox.Text = sr.ReadLine() ?? "";
+                htotalTextBox.Text = sr.ReadLine() ?? "";
+                vactiveTextBox.Text = sr.ReadLine() ?? "";
+                vbeginTextBox.Text = sr.ReadLine() ?? "";
+                vendTextBox.Text = sr.ReadLine() ?? "";
+                vtotalTextBox.Text = sr.ReadLine() ?? "";
+                interlacedCheckBox.IsChecked = sr.ReadLine() == "1";
+
+                int captureIndex, rotateIndex, cropIndex;
+                if (int.TryParse(sr.ReadLine(), out captureIndex))
+                    CaptureSourceBox.SelectedIndex = Math.Min(captureIndex, CaptureSourceBox.Items.Count - 1);
+                if (int.TryParse(sr.ReadLine(), out rotateIndex))
+                    RotateComboBox.SelectedIndex = Math.Min(rotateIndex, RotateComboBox.Items.Count - 1);
+                EnableAudioCheckBox.IsChecked = sr.ReadLine() == "1";
+                if (int.TryParse(sr.ReadLine(), out cropIndex))
+                    CropComboBox.SelectedIndex = Math.Min(cropIndex, CropComboBox.Items.Count - 1);
+
+                CaptureWidth.Text = sr.ReadLine() ?? "";
+                CaptureHeight.Text = sr.ReadLine() ?? "";
+                CaptureXOffset.Text = sr.ReadLine() ?? "";
+                CaptureYOffset.Text = sr.ReadLine() ?? "";
+
+                Log("Settings loaded.");
             }
-
-            TargetIpAddresTextBox.Text = sr.ReadLine();
-
-            ModelinePresetsBox.SelectedIndex = Math.Min(int.Parse(sr.ReadLine()), ModelinePresetsBox.Items.Count - 1);
-            pclockTextBox.Text = sr.ReadLine();
-            hactiveTextBox.Text = sr.ReadLine();
-            hbeginTextBox.Text = sr.ReadLine();
-            hendTextBox.Text = sr.ReadLine();
-            htotalTextBox.Text = sr.ReadLine();
-            vactiveTextBox.Text = sr.ReadLine();
-            vbeginTextBox.Text = sr.ReadLine();
-            vendTextBox.Text = sr.ReadLine();
-            vtotalTextBox.Text = sr.ReadLine();
-            interlacedCheckBox.IsChecked = sr.ReadLine() == "1" ? true : false;
-
-            CaptureSourceBox.SelectedIndex = Math.Min(int.Parse(sr.ReadLine()), CaptureSourceBox.Items.Count - 1);
-            RotateComboBox.SelectedIndex = Math.Min(int.Parse(sr.ReadLine()), RotateComboBox.Items.Count - 1);
-            EnableAudioCheckBox.IsChecked = sr.ReadLine() == "1" ? true : false;
-            CropComboBox.SelectedIndex = Math.Min(int.Parse(sr.ReadLine()), CropComboBox.Items.Count - 1);
-            CaptureWidth.Text = sr.ReadLine();
-            CaptureHeight.Text = sr.ReadLine();
-            CaptureXOffset.Text = sr.ReadLine();
-            CaptureYOffset.Text = sr.ReadLine();
-
-            Log("Settings loaded.");
+            catch (Exception e)
+            {
+                Log("Error parsing settings file: " + e.Message, true);
+            }
         }
 
         private void UpdateLastSaveFile(string fileName)
@@ -374,6 +403,7 @@ namespace MiSTerCast
         #region Logs
 
         private MiSTerCastInterop.LogDelegate LogDelegate;
+        private const int MaxLogEntries = 1000;
 
         private void Log(string message, bool error = false)
         {
@@ -382,7 +412,11 @@ namespace MiSTerCast
                 TextBlock logText = new TextBlock() { Text = message };
                 if (error)
                     logText.Background = Brushes.Pink;
-                LogPanel.Children.Add(logText);//.Insert(0, (logText));
+                LogPanel.Children.Add(logText);
+
+                // Remove oldest entries when log exceeds maximum
+                while (LogPanel.Children.Count > MaxLogEntries)
+                    LogPanel.Children.RemoveAt(0);
             });
         }
 

@@ -16,6 +16,11 @@ void LogMessage(std::string message, bool error)
 std::atomic_bool stopCapture = false;
 std::atomic_bool stopStream = false;
 std::string targetIpString;
+std::atomic_uint statsFramesSubmitted = 0;
+std::atomic_uint statsFpgaFrame = 0;
+std::atomic_uint statsFpgaVCount = 0;
+std::atomic_uint statsFpgaAudio = 0;
+std::atomic_uint statsFpgaSynced = 0;
 
 #include "groovymister.h"
 #include "renderer_nogpu.h"
@@ -141,6 +146,11 @@ MISTERCASTLIB_API bool StartStream(const char* targetIp)
 {
     LogMessage("Starting stream.");
     targetIpString = std::string(targetIp);
+    statsFramesSubmitted = 0;
+    statsFpgaFrame = 0;
+    statsFpgaVCount = 0;
+    statsFpgaAudio = 0;
+    statsFpgaSynced = 0;
     castScreenTask = std::make_unique<std::thread>(cast_screen);
 
     return true;
@@ -153,6 +163,23 @@ MISTERCASTLIB_API bool StopStream()
     if (castScreenTask && castScreenTask->joinable())
         castScreenTask->join();
     stopStream = false;
+    return true;
+}
+
+MISTERCASTLIB_API bool GetStreamStats(StreamStats* stats)
+{
+    if (stats == nullptr)
+        return false;
+
+    stats->initialized = initialized ? 1 : 0;
+    stats->capturing = capturing_screen ? 1 : 0;
+    stats->streaming = casting_screen ? 1 : 0;
+    stats->framesSubmitted = statsFramesSubmitted.load();
+    stats->fpgaFrame = statsFpgaFrame.load();
+    stats->fpgaVCount = statsFpgaVCount.load();
+    stats->fpgaAudio = statsFpgaAudio.load();
+    stats->fpgaSynced = statsFpgaSynced.load();
+
     return true;
 }
 

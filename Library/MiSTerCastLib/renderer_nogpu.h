@@ -324,6 +324,11 @@ void renderer_nogpu::draw()
     // Blit now
     groovyMister.CmdBlit(m_frame, m_field, 0/*m_vsync_scanline*/, 15000, 0);
     groovyMister.WaitSync();
+    statsFramesSubmitted = static_cast<unsigned int>(m_frame);
+    statsFpgaFrame = groovyMister.fpga.frame;
+    statsFpgaVCount = groovyMister.fpga.vCount;
+    statsFpgaAudio = groovyMister.fpga.audio;
+    statsFpgaSynced = groovyMister.fpga.vramSynced;
 
     time_blit = CurrentTicks();
     nogpu_register_frametime(time_entry - time_exit);

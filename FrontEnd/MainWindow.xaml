@@ -21,6 +21,10 @@
             </Grid.RowDefinitions>
             <GroupBox Header="Controls" Grid.Row="0">
                 <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
@@ -42,6 +46,7 @@
                         </Button.Resources> 
                         ?
                     </Button>
+                    <TextBlock x:Name="StreamStatusTextBlock" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="6" Margin="10 0 10 8" Text="Status: Not initialized" TextTrimming="CharacterEllipsis"/>
                 </Grid>
             </GroupBox>
             <Grid Grid.Row="2">
@@ -262,4 +267,3 @@
         </Grid>
     </Border>
 </Window>
-    

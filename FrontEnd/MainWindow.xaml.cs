@@ -12,6 +12,7 @@ using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using System.Globalization;
 using System.Net;
+using System.Windows.Threading;
 
 namespace MiSTerCast
 {
@@ -51,6 +52,7 @@ namespace MiSTerCast
         HelpWindow helpWindow = null;
         const string lastSaveFilename = "lastsave.dat";
         string currentSaveFilename = null;
+        private DispatcherTimer statusTimer;
 
         private void InitializeMiSTerCast()
         {
@@ -71,6 +73,51 @@ namespace MiSTerCast
             ReadModelinesFile();
             PopulateModelineDropdown();
             InitializeMiSTerCast();
+            statusTimer = new DispatcherTimer();
+            statusTimer.Interval = TimeSpan.FromMilliseconds(500);
+            statusTimer.Tick += StatusTimer_Tick;
+            statusTimer.Start();
+            UpdateStreamStatus();
+        }
+
+        private void StatusTimer_Tick(object sender, EventArgs e)
+        {
+            UpdateStreamStatus();
+        }
+
+        private void UpdateStreamStatus()
+        {
+            MiSTerCastInterop.StreamStats stats;
+            if (!MiSTerCastInterop.GetStreamStats(out stats))
+            {
+                StreamStatusTextBlock.Text = "Status: Unavailable";
+                return;
+            }
+
+            if (stats.streaming != 0)
+            {
+                string audio = stats.fpgaAudio != 0 ? "audio on" : "audio off";
+                string sync = stats.fpgaSynced != 0 ? "synced" : "sync pending";
+                StreamStatusTextBlock.Text = String.Format(
+                    "Status: Streaming | frame {0} | MiSTer frame {1} | vcount {2} | {3} | {4}",
+                    stats.framesSubmitted,
+                    stats.fpgaFrame,
+                    stats.fpgaVCount,
+                    audio,
+                    sync);
+            }
+            else if (stats.capturing != 0)
+            {
+                StreamStatusTextBlock.Text = "Status: Ready";
+            }
+            else if (stats.initialized != 0)
+            {
+                StreamStatusTextBlock.Text = "Status: Initialized";
+            }
+            else
+            {
+                StreamStatusTextBlock.Text = "Status: Not initialized";
+            }
         }
 
         void MainWindow_Closing(object sender, CancelEventArgs e)

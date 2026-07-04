@@ -22,6 +22,7 @@ std::atomic_uint statsFpgaVCount = 0;
 std::atomic_uint statsFpgaAudio = 0;
 std::atomic_uint statsFpgaSynced = 0;
 std::atomic_bool statsStreamFailed = false;
+std::atomic_uint statsStreamError = 0;
 
 #include "groovymister.h"
 #include "renderer_nogpu.h"
@@ -66,6 +67,8 @@ void cast_screen()
             if (!renderer->draw())
             {
                 statsStreamFailed = true;
+                if (statsStreamError == 0)
+                    statsStreamError = 1;
                 LogMessage("Stream startup failed.", true);
                 break;
             }
@@ -74,6 +77,7 @@ void cast_screen()
     catch (...)
     {
         statsStreamFailed = true;
+        statsStreamError = 100;
         LogMessage("Stream thread failed unexpectedly.", true);
     }
 
@@ -169,6 +173,8 @@ MISTERCASTLIB_API bool StartStream(const char* targetIp)
 
     if (targetIp == nullptr || targetIp[0] == '\0')
     {
+        statsStreamFailed = true;
+        statsStreamError = 101;
         LogMessage("Starting stream failed: target IP is empty.", true);
         return false;
     }
@@ -176,6 +182,7 @@ MISTERCASTLIB_API bool StartStream(const char* targetIp)
     LogMessage("Starting stream.");
     stopStream = false;
     statsStreamFailed = false;
+    statsStreamError = 0;
     targetIpString = std::string(targetIp);
     statsFramesSubmitted = 0;
     statsFpgaFrame = 0;
@@ -211,6 +218,7 @@ MISTERCASTLIB_API bool GetStreamStats(StreamStats* stats)
     stats->fpgaAudio = statsFpgaAudio.load();
     stats->fpgaSynced = statsFpgaSynced.load();
     stats->streamFailed = statsStreamFailed ? 1 : 0;
+    stats->streamError = statsStreamError.load();
 
     return true;
 }

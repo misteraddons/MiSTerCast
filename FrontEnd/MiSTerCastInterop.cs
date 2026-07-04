@@ -40,6 +40,7 @@ namespace MiSTerCast
             public UInt32 fpgaAudio;
             public UInt32 fpgaSynced;
             public UInt32 streamFailed;
+            public UInt32 streamError;
         }
 
         [DllImport("MISTERCASTLIB.dll", EntryPoint = "Initialize", CallingConvention = CallingConvention.Cdecl)]

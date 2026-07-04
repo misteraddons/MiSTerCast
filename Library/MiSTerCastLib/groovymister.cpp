@@ -353,7 +353,7 @@ int GroovyMister::CmdInit(const char* misterHost, uint16_t misterPort, int lz4Fr
 		m_sendRioBuffer.Offset = 0;
 		m_sendRioBuffer.Length = 26;
 
-		m_receiveRioBufferId = m_rio.RIORegisterBuffer(m_bufferReceive, 17);
+		m_receiveRioBufferId = m_rio.RIORegisterBuffer(m_bufferReceive, sizeof(m_bufferReceive));
 		if (m_receiveRioBufferId == RIO_INVALID_BUFFERID)
 		{
 			LOG(0,"[MiSTer] RIORegisterBuffer m_BufferReceive Error: %lu\n", ::GetLastError());
@@ -361,7 +361,7 @@ int GroovyMister::CmdInit(const char* misterHost, uint16_t misterPort, int lz4Fr
 		}
 		m_receiveRioBuffer.BufferId = m_receiveRioBufferId;
 		m_receiveRioBuffer.Offset = 0;
-		m_receiveRioBuffer.Length = 17;
+		m_receiveRioBuffer.Length = sizeof(m_bufferReceive);
 		
 		DWORD offset = 0;
 		for (int field = 0; field < 2; field++)
@@ -533,7 +533,7 @@ int GroovyMister::CmdInit(const char* misterHost, uint16_t misterPort, int lz4Fr
 	{
 		LOG(0,"[MiSTer] ACK failed with %d ms\n", 60);
 		CmdClose();
-		return -1;
+		return -23;
 	}
 	else
 	{
@@ -809,7 +809,7 @@ uint32_t GroovyMister::getACK(DWORD dwMilliseconds)
 						memcpy(&m_core_version, &m_bufferReceive[0], 1);
 					}
 					idx++;
-				} while (idx <= numResults);
+				} while (idx < numResults);
 				numResults = m_rio.RIODequeueCompletion(m_receiveQueue, results, numResults);
 			}
 			m_rio.RIOReceive(m_requestQueue, &m_receiveRioBuffer, 1, 0, &m_receiveRioBuffer);

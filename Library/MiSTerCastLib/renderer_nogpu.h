@@ -374,7 +374,11 @@ bool renderer_nogpu::nogpu_init()
     }
     else
     {
-        LogMessage("Groovy MiSTer API failed to initialize!", true);
+        statsStreamError = static_cast<unsigned int>(-ret);
+        if (ret == -23)
+            LogMessage("Groovy MiSTer API failed to initialize: no UDP ACK from " + m_targetip + ":" + std::to_string(UDP_PORT) + ".", true);
+        else
+            LogMessage("Groovy MiSTer API failed to initialize: error " + std::to_string(ret) + ".", true);
         return false;
     }
 }

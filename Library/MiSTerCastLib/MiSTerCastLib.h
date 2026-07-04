@@ -76,6 +76,7 @@ struct StreamStats {
     UINT32 fpgaAudio;
     UINT32 fpgaSynced;
     UINT32 streamFailed;
+    UINT32 streamError;
 };
 
 MISTERCASTLIB_API bool Initialize(log_function fnLog, capture_image_function fnCapture);

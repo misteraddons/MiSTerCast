@@ -101,7 +101,7 @@ namespace MiSTerCast
                     MiSTerCastInterop.StopStream();
                     SetStreamControls(false);
                 }
-                StreamStatusTextBlock.Text = "Status: Stream failed";
+                StreamStatusTextBlock.Text = "Status: Stream failed - " + DescribeStreamError(stats.streamError);
                 return;
             }
 
@@ -139,6 +139,23 @@ namespace MiSTerCast
             EnableAudioCheckBox.IsEnabled = !streaming;
             if (!streaming)
                 ApplyModelineButton.IsEnabled = false;
+        }
+
+        private string DescribeStreamError(UInt32 error)
+        {
+            switch (error)
+            {
+                case 23:
+                    return "no UDP ACK from MiSTer";
+                case 100:
+                    return "native stream thread error";
+                case 101:
+                    return "target IP is empty";
+                case 0:
+                    return "startup failed";
+                default:
+                    return "native error " + error;
+            }
         }
 
         void MainWindow_Closing(object sender, CancelEventArgs e)

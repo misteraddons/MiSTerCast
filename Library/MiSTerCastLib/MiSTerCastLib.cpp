@@ -25,10 +25,10 @@ void capture_screen()
 {
     LogMessage("Screen capture starting.");
     capturing_screen = true;
-    do
+    while (!stopCapture)
     {
         TickVideoCapture();
-    } while (!stopCapture);
+    }
     capturing_screen = false;
     LogMessage("Screen capture stopped.");
 }
@@ -52,10 +52,10 @@ void cast_screen()
     {
         auto renderer = std::make_unique<renderer_nogpu>(targetIpString);
         {
-            do
+            while (!stopStream)
             {
                 renderer->draw();
-            } while (!stopStream);
+            }
         }
     }
     casting_screen = false;
@@ -123,11 +123,15 @@ MISTERCASTLIB_API bool Initialize(log_function fnLog, capture_image_function fnC
 MISTERCASTLIB_API bool Shutdown()
 {
     stopCapture = true;
-    do {} while (capturing_screen); // wait for threads
+
+    if (captureScreenTask && captureScreenTask->joinable())
+        captureScreenTask->join();
     stopCapture = false;
 
-    captureScreenTask->detach();
+    CleanupVideoCapture();
+    CleanupAudioCapture();
 
+    initialized = false;
     return true;
 }
 
@@ -145,10 +149,10 @@ MISTERCASTLIB_API bool StartStream(const char* targetIp)
 MISTERCASTLIB_API bool StopStream()
 {
     stopStream = true;
-    do {} while (casting_screen); // wait for threads
-    stopStream = false;
 
-    castScreenTask->detach();
+    if (castScreenTask && castScreenTask->joinable())
+        castScreenTask->join();
+    stopStream = false;
     return true;
 }
 
@@ -233,10 +237,11 @@ MISTERCASTLIB_API bool SetSource(
     if (displayIndex != source_config.display)
     {
         stopCapture = true;
-        do {} while (capturing_screen); // wait for threads
+
+        if (captureScreenTask && captureScreenTask->joinable())
+            captureScreenTask->join();
         stopCapture = false;
 
-        captureScreenTask->detach();
         CleanupVideoCapture();
         InitializeVideoCapture(source_config.display, captureFunction);
         captureScreenTask = std::make_unique<std::thread>(capture_screen);

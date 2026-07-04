@@ -211,6 +211,7 @@ void renderer_nogpu::draw()
         stepx = ((float)(screenwidth) / (float)m_height);
         stepy = ((float)(screenheight) / (float)m_width);
         interlaceStepX = int(stepx / 2.0f);
+        break;
     case Rotation::CCW90:
         stepx = ((float)(screenwidth) / (float)m_height);
         stepy = ((float)(screenheight) / (float)m_width);
@@ -222,6 +223,7 @@ void renderer_nogpu::draw()
         stepy = ((float)(screenheight) / (float)m_height);
         interlaceStepY = int(stepy / 2.0f);
         drawInt = !drawInt;
+        break;
     default:
         stepx = ((float)(screenwidth) / (float)m_width);
         stepy = ((float)(screenheight) / (float)m_height);
@@ -230,6 +232,9 @@ void renderer_nogpu::draw()
     }
 
     char* fb = groovyMister.getPBufferBlit(m_field);
+    if (!fb)
+        return;
+
     for (unsigned int i = 0; i < (pitch * m_height * 4); i += 4)
     {
         int x = (i / 4) % m_width;
@@ -259,10 +264,12 @@ void renderer_nogpu::draw()
             bmpy += interlaceStepY;
         }
         int bmpi = (bmpy * screenwidth + bmpx) * 4;
-        if (bmpi + 4 >= (screenheight * screenwidth * 4))
+        const int sourceBufferSize = screenheight * screenwidth * 4;
+        if (bmpi < 0 || bmpi + 2 >= sourceBufferSize)
             continue;
+        if (j + 2 >= BUFFER_SIZE)
+            break;
 
-        
         fb[j] =     (char)videoCaptures[drawIndex].buffer[bmpi];
         fb[j + 1] = (char)videoCaptures[drawIndex].buffer[bmpi + 1];
         fb[j + 2] = (char)videoCaptures[drawIndex].buffer[bmpi + 2];
@@ -331,8 +338,6 @@ void renderer_nogpu::draw()
 
 bool renderer_nogpu::nogpu_init()
 {
-    int result;
-
     m_compression = 0x01; // lz4 compression
 
     switch (audioSampleRate)
@@ -374,32 +379,28 @@ bool renderer_nogpu::nogpu_init()
 
 bool renderer_nogpu::nogpu_switch_video_mode()
 {
-    nogpu_modeline *mode = &selected_modeline;
-    if (mode == nullptr)
-        return false;
-
-    m_current_mode = *mode;
+    m_current_mode = selected_modeline;
 
     // Send new modeline to nogpu
     LogMessage("Sending CMD_SWITCHRES...");
 
-    m_width = mode->hactive;
-    m_height = mode->vactive;
-    m_vtotal = mode->vtotal;
+    m_width = selected_modeline.hactive;
+    m_height = selected_modeline.vactive;
+    m_vtotal = selected_modeline.vtotal;
     m_field = 0;
 
     shouldUpdateVideoMode = false;
     groovyMister.CmdSwitchres(
-        mode->pclock,
-        mode->hactive,
-        mode->hbegin,
-        mode->hend,
-        mode->htotal,
-        mode->vactive,
-        mode->vbegin,
-        mode->vend,
-        mode->vtotal,
-        mode->interlace
+        selected_modeline.pclock,
+        selected_modeline.hactive,
+        selected_modeline.hbegin,
+        selected_modeline.hend,
+        selected_modeline.htotal,
+        selected_modeline.vactive,
+        selected_modeline.vbegin,
+        selected_modeline.vend,
+        selected_modeline.vtotal,
+        selected_modeline.interlace
     );
 
     return true;
@@ -425,7 +426,7 @@ void renderer_nogpu::nogpu_register_frametime(uint64_t frametime)
     time_frame[i] = frametime;
     i++;
 
-    if (i > max_regs)
+    if (i >= max_regs)
         i = 0;
 
     if (regs < max_regs)
@@ -439,7 +440,7 @@ void renderer_nogpu::nogpu_register_frametime(uint64_t frametime)
     // Compute current max deviation
     uint64_t max_diff = 0;
 
-    for (int k = 1; k <= regs; k++)
+    for (int k = 1; k < regs; k++)
     {
         diff = time_frame[k] - time_frame[k - 1];
 

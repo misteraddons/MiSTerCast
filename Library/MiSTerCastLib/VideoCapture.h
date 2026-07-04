@@ -94,17 +94,17 @@ bool InitializeVideoCapture(int outputNumber, capture_image_function fnCapture)
     hr = dxgiAdapter->EnumOutputs(displayIndex, &dxgiOutput);
     dxgiAdapter->Release();
     dxgiAdapter = nullptr;
-    EXIT_ON_ERROR(hr, "DxgiAdapter->EnumOutputs faile");
+    EXIT_ON_ERROR(hr, "DxgiAdapter->EnumOutputs failed");
 
     // DXGI_OUTPUT_DESC        outputDesc;
     // hr = dxgiOutput->GetDesc(&outputDesc);
-    // EXIT_ON_ERROR(hr, "DxgiOutput->GetDesc faile");
+    // EXIT_ON_ERROR(hr, "DxgiOutput->GetDesc failed");
 
     IDXGIOutput1* dxgiOutput1 = nullptr;
     hr = dxgiOutput->QueryInterface(__uuidof(dxgiOutput1), (void**)&dxgiOutput1);
     dxgiOutput->Release();
     dxgiOutput = nullptr;
-    EXIT_ON_ERROR(hr, "DxgiOutput->QueryInterface faile");
+    EXIT_ON_ERROR(hr, "DxgiOutput->QueryInterface failed");
 
     hr = dxgiOutput1->DuplicateOutput(d3dDevice, &desktopDuplication);
     dxgiOutput1->Release();
@@ -120,6 +120,12 @@ void CleanupVideoCapture()
     SAFE_RELEASE(d3dDeviceContext);
     SAFE_RELEASE(d3dDevice);
     haveFrameLock = false;
+
+    if (videoCaptures != nullptr)
+    {
+        delete[] videoCaptures;
+        videoCaptures = nullptr;
+    }
 }
 
 bool TickVideoCapture()
@@ -264,6 +270,7 @@ bool TickVideoCapture()
         break;
     case Alignment::Left:
         yoffset += desc.Height / 2 - height / 2;
+        break;
     default:
         break;
     }
@@ -315,8 +322,17 @@ bool TickVideoCapture()
         videoCaptures[nextIndex].buffer.resize(width * height * 4);
     }
 
-    for (int y = 0; y < (int)height; y++) // TODO: Can this be improved?
-        memcpy(videoCaptures[nextIndex].buffer.data() + y * width * 4, (uint8_t*)sr.pData + sr.RowPitch * y, width * 4);
+    // Optimize: single copy when row pitch matches expected stride
+    if (sr.RowPitch == width * 4)
+    {
+        memcpy(videoCaptures[nextIndex].buffer.data(), sr.pData, width * height * 4);
+    }
+    else
+    {
+        // Row-by-row copy when GPU texture has padding
+        for (unsigned int y = 0; y < height; y++)
+            memcpy(videoCaptures[nextIndex].buffer.data() + y * width * 4, (uint8_t*)sr.pData + sr.RowPitch * y, width * 4);
+    }
     d3dDeviceContext->Unmap(cpuTex, 0);
 
     if (currentSourceOptions.preview)

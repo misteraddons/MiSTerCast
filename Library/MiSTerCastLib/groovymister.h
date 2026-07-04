@@ -146,6 +146,7 @@ class GroovyMister
 	RIO_BUF m_sendRioBufferAudio;
 	RIO_BUF *m_pBufsAudio;
 	SOCKET m_sockInputsFD;
+	bool m_winsockStarted;
 
 	LARGE_INTEGER m_tickStart;
 	LARGE_INTEGER m_tickEnd;

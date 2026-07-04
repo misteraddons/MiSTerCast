@@ -116,6 +116,26 @@ GroovyMister::GroovyMister()
 	memset(&m_tickSync, 0, sizeof(m_tickSync));
 	memset(&m_tickCongestion, 0, sizeof(m_tickCongestion));
 
+#ifdef _WIN32
+	m_sockFD = INVALID_SOCKET;
+	m_sockInputsFD = INVALID_SOCKET;
+	memset(&m_rio, 0, sizeof(m_rio));
+	m_sendQueue = RIO_INVALID_CQ;
+	m_receiveQueue = RIO_INVALID_CQ;
+	m_requestQueue = RIO_INVALID_RQ;
+	m_hIOCP = NULL;
+	m_sendRioBufferId = RIO_INVALID_BUFFERID;
+	m_receiveRioBufferId = RIO_INVALID_BUFFERID;
+	m_sendRioBufferAudioId = RIO_INVALID_BUFFERID;
+	m_pBufsAudio = nullptr;
+	m_winsockStarted = false;
+	for (int i = 0; i < 2; i++)
+	{
+		m_sendRioBufferBlitId[i] = RIO_INVALID_BUFFERID;
+		m_pBufsBlit[i] = nullptr;
+	}
+#endif
+
 	DWORD totalBufferCount = 0;
 	DWORD totalBufferSize = 0;
 	m_pBufferAudio = AllocateBufferSpace(BUFFER_SIZE, 1, totalBufferSize, totalBufferCount);
@@ -174,23 +194,73 @@ void GroovyMister::CmdClose(void)
 #ifdef _WIN32
 	if (USE_RIO)
 	{
-		m_rio.RIOCloseCompletionQueue(m_sendQueue);
-		m_rio.RIOCloseCompletionQueue(m_receiveQueue);
-		m_rio.RIODeregisterBuffer(m_sendRioBufferId);
-		m_rio.RIODeregisterBuffer(m_sendRioBufferAudioId);
+		if (m_sendQueue != RIO_INVALID_CQ)
+		{
+			m_rio.RIOCloseCompletionQueue(m_sendQueue);
+			m_sendQueue = RIO_INVALID_CQ;
+		}
+		if (m_receiveQueue != RIO_INVALID_CQ)
+		{
+			m_rio.RIOCloseCompletionQueue(m_receiveQueue);
+			m_receiveQueue = RIO_INVALID_CQ;
+		}
+		if (m_sendRioBufferId != RIO_INVALID_BUFFERID)
+		{
+			m_rio.RIODeregisterBuffer(m_sendRioBufferId);
+			m_sendRioBufferId = RIO_INVALID_BUFFERID;
+		}
+		if (m_receiveRioBufferId != RIO_INVALID_BUFFERID)
+		{
+			m_rio.RIODeregisterBuffer(m_receiveRioBufferId);
+			m_receiveRioBufferId = RIO_INVALID_BUFFERID;
+		}
+		if (m_sendRioBufferAudioId != RIO_INVALID_BUFFERID)
+		{
+			m_rio.RIODeregisterBuffer(m_sendRioBufferAudioId);
+			m_sendRioBufferAudioId = RIO_INVALID_BUFFERID;
+		}
 		for (int i=0;i<2;i++)
 		{
-			m_rio.RIODeregisterBuffer(m_sendRioBufferBlitId[i]);
+			if (m_sendRioBufferBlitId[i] != RIO_INVALID_BUFFERID)
+			{
+				m_rio.RIODeregisterBuffer(m_sendRioBufferBlitId[i]);
+				m_sendRioBufferBlitId[i] = RIO_INVALID_BUFFERID;
+			}
 		}
 
 	}
-	::closesocket(m_sockFD);
-	::closesocket(m_sockInputsFD);
-	::WSACleanup();
+	if (m_hIOCP != NULL)
+	{
+		::CloseHandle(m_hIOCP);
+		m_hIOCP = NULL;
+	}
+	if (m_sockFD != INVALID_SOCKET)
+	{
+		::closesocket(m_sockFD);
+		m_sockFD = INVALID_SOCKET;
+	}
+	if (m_sockInputsFD != INVALID_SOCKET)
+	{
+		::closesocket(m_sockInputsFD);
+		m_sockInputsFD = INVALID_SOCKET;
+	}
+	if (m_winsockStarted)
+	{
+		::WSACleanup();
+		m_winsockStarted = false;
+	}
+	delete[] m_pBufsAudio;
+	m_pBufsAudio = nullptr;
+	for (int i = 0; i < 2; i++)
+	{
+		delete[] m_pBufsBlit[i];
+		m_pBufsBlit[i] = nullptr;
+	}
 #else
 	close(m_sockFD);
 	close(m_sockInputsFD);
 #endif
+	m_isConnected = 0;
 }
 
 void GroovyMister::setVerbose(uint8_t sev)
@@ -224,6 +294,7 @@ int GroovyMister::CmdInit(const char* misterHost, uint16_t misterPort, int lz4Fr
 		LOG(0, "[MiSTer] Unable to load Winsock: %d\n", rc);
 		return -1;
 	}
+	m_winsockStarted = true;
 
 	m_sockFD = INVALID_SOCKET;
 

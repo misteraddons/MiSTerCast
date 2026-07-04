@@ -94,6 +94,17 @@ namespace MiSTerCast
                 return;
             }
 
+            if (stats.streamFailed != 0)
+            {
+                if (isStreaming)
+                {
+                    MiSTerCastInterop.StopStream();
+                    SetStreamControls(false);
+                }
+                StreamStatusTextBlock.Text = "Status: Stream failed";
+                return;
+            }
+
             if (stats.streaming != 0)
             {
                 string audio = stats.fpgaAudio != 0 ? "audio on" : "audio off";
@@ -118,6 +129,16 @@ namespace MiSTerCast
             {
                 StreamStatusTextBlock.Text = "Status: Not initialized";
             }
+        }
+
+        private void SetStreamControls(bool streaming)
+        {
+            isStreaming = streaming;
+            ToggleStreamButton.Content = streaming ? "Stop Stream" : "Start Stream";
+            CaptureSourceBox.IsEnabled = !streaming;
+            EnableAudioCheckBox.IsEnabled = !streaming;
+            if (!streaming)
+                ApplyModelineButton.IsEnabled = false;
         }
 
         void MainWindow_Closing(object sender, CancelEventArgs e)
@@ -198,11 +219,7 @@ namespace MiSTerCast
             {
                 if (MiSTerCastInterop.StopStream())
                 {
-                    isStreaming = false;
-                    ToggleStreamButton.Content = "Start Stream";
-                    CaptureSourceBox.IsEnabled = true;
-                    EnableAudioCheckBox.IsEnabled = true;
-                    ApplyModelineButton.IsEnabled = false;
+                    SetStreamControls(false);
                 }
             }
             else
@@ -237,10 +254,7 @@ namespace MiSTerCast
 
                     if (MiSTerCastInterop.StartStream(ipAddress.ToString()))
                     {
-                        isStreaming = true;
-                        ToggleStreamButton.Content = "Stop Stream";
-                        CaptureSourceBox.IsEnabled = false;
-                        EnableAudioCheckBox.IsEnabled = false;
+                        SetStreamControls(true);
                     }
                 }
             }

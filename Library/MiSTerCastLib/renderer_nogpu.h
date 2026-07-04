@@ -68,7 +68,7 @@ public:
 
     ~renderer_nogpu();
     int create();
-    void draw();
+    bool draw();
     void save() {}
     void record() {}
     void toggle_fsfx() {}
@@ -138,7 +138,7 @@ renderer_nogpu::~renderer_nogpu()
 //============================================================
 //  renderer_nogpu::draw
 //============================================================
-void renderer_nogpu::draw()
+bool renderer_nogpu::draw()
 {
     // Hack because these aren't intiailized...
     m_width = selected_modeline.hactive;
@@ -176,12 +176,13 @@ void renderer_nogpu::draw()
         else
         {
             m_first_blit = false;
+            return false;
         }
     }
 
     // only send frame if nogpu is initialized
     if (!m_initialized)
-        return;
+        return false;
 
     m_frame++;
 
@@ -233,7 +234,7 @@ void renderer_nogpu::draw()
 
     char* fb = groovyMister.getPBufferBlit(m_field);
     if (!fb)
-        return;
+        return true;
 
     for (unsigned int i = 0; i < (pitch * m_height * 4); i += 4)
     {
@@ -295,7 +296,7 @@ void renderer_nogpu::draw()
         m_frame = 0;
 
         // Skip blitting first frame, so we avoid glitches while MAME loads roms
-        return;
+        return true;
     }
 
     int vsync_offset = 0;
@@ -334,7 +335,7 @@ void renderer_nogpu::draw()
     nogpu_register_frametime(time_entry - time_exit);
     time_exit = CurrentTicks();
 
-    return;
+    return true;
 }
 
 //============================================================
@@ -373,7 +374,7 @@ bool renderer_nogpu::nogpu_init()
     }
     else
     {
-        LogMessage("Groovy MiSTer API failed to initialize!");
+        LogMessage("Groovy MiSTer API failed to initialize!", true);
         return false;
     }
 }

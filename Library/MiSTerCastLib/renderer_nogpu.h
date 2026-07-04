@@ -185,8 +185,8 @@ void renderer_nogpu::draw()
 
     m_frame++;
 
-    if (groovyMister.fpga.frame > m_frame)
-        m_frame = groovyMister.fpga.frame + 1;
+    if (groovyMister.fpga.frame > static_cast<uint32_t>(m_frame))
+        m_frame = static_cast<int>(groovyMister.fpga.frame + 1);
 
     // get current field for interlaced mode
     if (m_current_mode.interlace)

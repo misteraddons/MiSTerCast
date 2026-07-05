@@ -44,6 +44,7 @@
     <Reference Include="System.Xml" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="System.Net.Http" />
@@ -81,6 +82,7 @@
     <Compile Include="HelpWindow.xaml.cs">
       <DependentUpon>HelpWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="GroovyReleaseDownloader.cs" />
     <Compile Include="GroovyTargetConfigurator.cs" />
     <Compile Include="GroovyTargetDeployer.cs" />
     <Compile Include="GroovyMisterProbe.cs" />

@@ -40,6 +40,34 @@ namespace MiSTerCast
                 GroovyRbfPathTextBox.Text = dialog.FileName;
         }
 
+        private async void DownloadLatestButton_Click(object sender, RoutedEventArgs e)
+        {
+            DownloadLatestButton.IsEnabled = false;
+            ReleaseStatusTextBlock.Text = "Checking GitHub...";
+
+            try
+            {
+                var downloader = new GroovyReleaseDownloader();
+                GroovyReleaseInfo release = await downloader.DownloadLatestAsync((message, error) =>
+                {
+                    ReleaseStatusTextBlock.Text = message;
+                });
+
+                MisterBinaryPathTextBox.Text = release.MisterBinaryPath;
+                GroovyRbfPathTextBox.Text = release.GroovyRbfPath;
+                ReleaseStatusTextBlock.Text = "Ready: " + release.DisplayName;
+            }
+            catch (Exception exception)
+            {
+                ReleaseStatusTextBlock.Text = "Download failed";
+                MessageBox.Show(this, exception.Message, "Download Latest", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            finally
+            {
+                DownloadLatestButton.IsEnabled = true;
+            }
+        }
+
         private void DeployButton_Click(object sender, RoutedEventArgs e)
         {
             if (String.IsNullOrWhiteSpace(TargetTextBox.Text))

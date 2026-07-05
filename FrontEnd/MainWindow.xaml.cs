@@ -127,6 +127,7 @@ namespace MiSTerCast
         private void SetStreamControls(bool streaming)
         {
             isStreaming = streaming;
+            ToggleStreamButton.IsEnabled = true;
             ToggleStreamButton.Content = streaming ? "Stop Stream" : "Start Stream";
             CaptureSourceBox.IsEnabled = !streaming;
             EnableAudioCheckBox.IsEnabled = !streaming;
@@ -196,12 +197,22 @@ namespace MiSTerCast
 
         private async void ConfigureTargetButton_Click(object sender, RoutedEventArgs e)
         {
+            await ConfigureTargetWithDialogAsync();
+        }
+
+        private async Task<bool> ConfigureTargetWithDialogAsync()
+        {
             var dialog = new ConfigureTargetWindow(CreateDefaultTargetDeploymentConfig());
             dialog.Owner = this;
             if (dialog.ShowDialog() != true)
-                return;
+                return false;
 
             var config = dialog.DeploymentConfig;
+            return await ConfigureTargetAsync(config);
+        }
+
+        private async Task<bool> ConfigureTargetAsync(GroovyTargetDeploymentConfig config)
+        {
             TargetIpAddresTextBox.Text = config.Target;
             ConfigureTargetButton.IsEnabled = false;
             TestTargetButton.IsEnabled = false;
@@ -234,17 +245,20 @@ namespace MiSTerCast
                         result.Frame,
                         result.VCount,
                         result.StatusBits));
+                    return true;
                 }
                 else
                 {
                     StreamStatusTextBlock.Text = "Status: Target configured; probe failed - " + result.Message;
                     Log("Groovy target configured, but UDP probe failed: " + result.Message, true);
+                    return false;
                 }
             }
             catch (Exception exception)
             {
                 StreamStatusTextBlock.Text = "Status: Configure target failed";
                 Log("Configure target failed: " + exception.Message, true);
+                return false;
             }
             finally
             {
@@ -342,7 +356,7 @@ namespace MiSTerCast
             }
         }
 
-        private void ToggleStreamButton_Click(object sender, RoutedEventArgs e)
+        private async void ToggleStreamButton_Click(object sender, RoutedEventArgs e)
         {
             if (isStreaming)
             {
@@ -353,39 +367,246 @@ namespace MiSTerCast
             }
             else
             {
-                if (!isInitialized)
-                    InitializeMiSTerCast();
+                await StartStreamWithGuardAsync();
+            }
+        }
 
-                if (isInitialized)
+        private async Task StartStreamWithGuardAsync()
+        {
+            if (!isInitialized)
+                InitializeMiSTerCast();
+            if (!isInitialized)
+                return;
+
+            string target = TargetIpAddresTextBox.Text.Trim();
+            IPAddress ipAddress;
+            if (!TryResolveTargetIpAddress(target, out ipAddress))
+                return;
+
+            ToggleStreamButton.IsEnabled = false;
+            ConfigureTargetButton.IsEnabled = false;
+            TestTargetButton.IsEnabled = false;
+
+            try
+            {
+                EnablePreviewCheckBox.IsChecked = false;
+                StreamStatusTextBlock.Text = "Status: Checking Groovy_MiSTer...";
+                var probe = await GroovyMisterProbe.ProbeAsync(target, 1000);
+                if (!probe.Success)
                 {
-                    EnablePreviewCheckBox.IsChecked = false;
-                    IPAddress ipAddress = null;
-                    if (!IPAddress.TryParse(TargetIpAddresTextBox.Text, out ipAddress))
+                    Log("Groovy_MiSTer is not responding; checking target setup...");
+                    bool ready = await EnsureGroovyReadyForStreamingAsync(target);
+                    if (!ready)
                     {
-                        try
-                        {
-                            var hostEntry = Dns.GetHostEntry(TargetIpAddresTextBox.Text);
-                            if (hostEntry.AddressList == null || hostEntry.AddressList.Length == 0)
-                            {
-                                Log("No IP addresses found for hostname: " + TargetIpAddresTextBox.Text, true);
-                                return;
-                            }
-                            // Prefer IPv4 addresses
-                            ipAddress = hostEntry.AddressList.FirstOrDefault(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-                                ?? hostEntry.AddressList[0];
-                        }
-                        catch (Exception exception)
-                        {
-                            Log("Resolving target IP address failed: " + exception.Message, true);
-                            return;
-                        }
+                        StreamStatusTextBlock.Text = "Status: Start Stream canceled";
+                        return;
                     }
 
-                    if (MiSTerCastInterop.StartStream(ipAddress.ToString()))
-                    {
-                        SetStreamControls(true);
-                    }
+                    if (!TryResolveTargetIpAddress(target, out ipAddress))
+                        return;
                 }
+
+                if (MiSTerCastInterop.StartStream(ipAddress.ToString()))
+                    SetStreamControls(true);
+            }
+            finally
+            {
+                if (!isStreaming)
+                {
+                    ToggleStreamButton.IsEnabled = true;
+                    ConfigureTargetButton.IsEnabled = true;
+                    TestTargetButton.IsEnabled = true;
+                }
+            }
+        }
+
+        private async Task<bool> EnsureGroovyReadyForStreamingAsync(string target)
+        {
+            var config = CreateDefaultTargetDeploymentConfig();
+            config.Target = target;
+            var deployer = new GroovyTargetDeployer();
+
+            try
+            {
+                GroovyReleaseInfo latestRelease = await TryGetLatestGroovyReleaseAsync();
+                GroovyTargetStatus status = await deployer.GetTargetStatusAsync(config, Log);
+                GroovyStreamRepairAction action = GroovyStreamGuard.DecideRepairAction(status, latestRelease);
+
+                if (action == GroovyStreamRepairAction.InstallLatest)
+                    return await PromptInstallLatestAndStartAsync(config, latestRelease);
+
+                if (action == GroovyStreamRepairAction.UpdateLatest)
+                    return await PromptUpdateLatestOrLaunchExistingAsync(config, latestRelease, status.Manifest);
+
+                if (action == GroovyStreamRepairAction.OfferUpdateOrLaunchExisting)
+                    return await PromptUnknownVersionUpdateOrLaunchAsync(config, latestRelease);
+
+                return await LaunchExistingAndWaitAsync(config, deployer);
+            }
+            catch (Exception exception)
+            {
+                Log("Automatic target repair failed: " + exception.Message, true);
+                MessageBoxResult result = MessageBox.Show(
+                    this,
+                    "MiSTerCast could not automatically check or launch Groovy_MiSTer. Open Configure Target?",
+                    "Start Stream",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+                return result == MessageBoxResult.Yes && await ConfigureTargetWithDialogAsync();
+            }
+        }
+
+        private async Task<GroovyReleaseInfo> TryGetLatestGroovyReleaseAsync()
+        {
+            try
+            {
+                Log("Checking latest Groovy_MiSTer release...");
+                return await new GroovyReleaseDownloader().GetLatestReleaseAsync();
+            }
+            catch (Exception exception)
+            {
+                Log("Could not check latest Groovy_MiSTer release: " + exception.Message, true);
+                return null;
+            }
+        }
+
+        private async Task<bool> PromptInstallLatestAndStartAsync(GroovyTargetDeploymentConfig config, GroovyReleaseInfo latestRelease)
+        {
+            if (latestRelease == null)
+                return await PromptConfigureTargetAsync("Groovy_MiSTer is not installed and MiSTerCast could not check GitHub for the latest release. Open Configure Target?");
+
+            MessageBoxResult result = MessageBox.Show(
+                this,
+                "Groovy_MiSTer is not installed on this target. Install the latest release and start streaming?",
+                "Start Stream",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+            if (result != MessageBoxResult.Yes)
+                return false;
+
+            return await DeployLatestAndWaitAsync(config, forceRedeploy: false);
+        }
+
+        private async Task<bool> PromptUpdateLatestOrLaunchExistingAsync(GroovyTargetDeploymentConfig config, GroovyReleaseInfo latestRelease, GroovyTargetManifest manifest)
+        {
+            string installed = manifest == null || String.IsNullOrWhiteSpace(manifest.TagName) ? "unknown" : manifest.TagName;
+            MessageBoxResult result = MessageBox.Show(
+                this,
+                "Installed Groovy_MiSTer is " + installed + "; latest is " + latestRelease.TagName + "." + Environment.NewLine +
+                "Yes = update and start, No = launch installed version, Cancel = stop.",
+                "Start Stream",
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Question);
+            if (result == MessageBoxResult.Cancel)
+                return false;
+            if (result == MessageBoxResult.Yes)
+                return await DeployLatestAndWaitAsync(config, forceRedeploy: true);
+
+            return await LaunchExistingAndWaitAsync(config, new GroovyTargetDeployer());
+        }
+
+        private async Task<bool> PromptUnknownVersionUpdateOrLaunchAsync(GroovyTargetDeploymentConfig config, GroovyReleaseInfo latestRelease)
+        {
+            MessageBoxResult result = MessageBox.Show(
+                this,
+                "Groovy_MiSTer is installed, but MiSTerCast does not know its release version." + Environment.NewLine +
+                "Yes = update to latest and start, No = launch installed version, Cancel = stop.",
+                "Start Stream",
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Question);
+            if (result == MessageBoxResult.Cancel)
+                return false;
+            if (result == MessageBoxResult.Yes)
+                return await DeployLatestAndWaitAsync(config, forceRedeploy: true);
+
+            return await LaunchExistingAndWaitAsync(config, new GroovyTargetDeployer());
+        }
+
+        private async Task<bool> PromptConfigureTargetAsync(string message)
+        {
+            MessageBoxResult result = MessageBox.Show(
+                this,
+                message,
+                "Start Stream",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+            return result == MessageBoxResult.Yes && await ConfigureTargetWithDialogAsync();
+        }
+
+        private async Task<bool> DeployLatestAndWaitAsync(GroovyTargetDeploymentConfig config, bool forceRedeploy)
+        {
+            var downloader = new GroovyReleaseDownloader();
+            GroovyReleaseInfo release = await downloader.DownloadLatestAsync(Log);
+            config.MisterBinaryPath = release.MisterBinaryPath;
+            config.GroovyRbfPath = release.GroovyRbfPath;
+            config.ReleaseManifest = GroovyTargetManifest.FromRelease(release);
+            config.ForceRedeploy = forceRedeploy;
+
+            await new GroovyTargetDeployer().ConfigureAndLaunchAsync(config, Log);
+            return await WaitForGroovyAfterLaunchAsync(config.Target);
+        }
+
+        private async Task<bool> LaunchExistingAndWaitAsync(GroovyTargetDeploymentConfig config, GroovyTargetDeployer deployer)
+        {
+            Log("Launching installed Groovy core...");
+            await deployer.LaunchExistingAsync(config, Log);
+            return await WaitForGroovyAfterLaunchAsync(config.Target);
+        }
+
+        private async Task<bool> WaitForGroovyAfterLaunchAsync(string target)
+        {
+            StreamStatusTextBlock.Text = "Status: Groovy core launched; waiting for UDP ACK...";
+            var result = await GroovyMisterProbe.ProbeUntilAsync(
+                target,
+                GroovyMisterProbe.DefaultPostLaunchProbeTimeoutMilliseconds,
+                GroovyMisterProbe.DefaultPostLaunchAttemptTimeoutMilliseconds,
+                GroovyMisterProbe.DefaultPostLaunchRetryDelayMilliseconds,
+                Log);
+
+            if (result.Success)
+            {
+                StreamStatusTextBlock.Text = String.Format(
+                    "Status: Groovy_MiSTer detected at {0}:{1}",
+                    result.Address,
+                    result.Port);
+                Log(String.Format(
+                    "Groovy_MiSTer detected at {0}:{1}. frame={2}, vcount={3}, status=0x{4:X2}",
+                    result.Address,
+                    result.Port,
+                    result.Frame,
+                    result.VCount,
+                    result.StatusBits));
+                return true;
+            }
+
+            StreamStatusTextBlock.Text = "Status: Groovy core launch probe failed - " + result.Message;
+            Log("Groovy core launched, but UDP probe failed: " + result.Message, true);
+            return false;
+        }
+
+        private bool TryResolveTargetIpAddress(string target, out IPAddress ipAddress)
+        {
+            ipAddress = null;
+            if (IPAddress.TryParse(target, out ipAddress))
+                return true;
+
+            try
+            {
+                var hostEntry = Dns.GetHostEntry(target);
+                if (hostEntry.AddressList == null || hostEntry.AddressList.Length == 0)
+                {
+                    Log("No IP addresses found for hostname: " + target, true);
+                    return false;
+                }
+
+                ipAddress = hostEntry.AddressList.FirstOrDefault(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                    ?? hostEntry.AddressList[0];
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Log("Resolving target IP address failed: " + exception.Message, true);
+                return false;
             }
         }
 

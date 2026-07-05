@@ -83,8 +83,10 @@
       <DependentUpon>HelpWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="GroovyReleaseDownloader.cs" />
+    <Compile Include="GroovyStreamGuard.cs" />
     <Compile Include="GroovyTargetConfigurator.cs" />
     <Compile Include="GroovyTargetDeployer.cs" />
+    <Compile Include="GroovyTargetManifest.cs" />
     <Compile Include="GroovyMisterProbe.cs" />
     <Compile Include="StreamStatusFormatter.cs" />
     <Compile Include="MainWindow.xaml.cs">

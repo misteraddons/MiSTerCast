@@ -21,6 +21,12 @@ namespace MiSTerCast
         }
     }
 
+    class GroovyTargetStatus
+    {
+        public GroovyTargetInventory Inventory { get; set; }
+        public GroovyTargetManifest Manifest { get; set; }
+    }
+
     class GroovyTargetDeploymentPlan
     {
         public bool UploadMisterBinary { get; set; }
@@ -38,6 +44,7 @@ namespace MiSTerCast
         public string MisterBinaryPath { get; set; }
         public string GroovyRbfPath { get; set; }
         public bool ForceRedeploy { get; set; }
+        public GroovyTargetManifest ReleaseManifest { get; set; }
     }
 
     static class GroovyTargetConfigurator

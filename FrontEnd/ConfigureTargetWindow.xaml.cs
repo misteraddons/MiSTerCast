@@ -7,6 +7,7 @@ namespace MiSTerCast
     public partial class ConfigureTargetWindow : Window
     {
         internal GroovyTargetDeploymentConfig DeploymentConfig { get; private set; }
+        private GroovyReleaseInfo downloadedRelease;
 
         public ConfigureTargetWindow(GroovyTargetDeploymentConfig config)
         {
@@ -55,6 +56,7 @@ namespace MiSTerCast
 
                 MisterBinaryPathTextBox.Text = release.MisterBinaryPath;
                 GroovyRbfPathTextBox.Text = release.GroovyRbfPath;
+                downloadedRelease = release;
                 ReleaseStatusTextBlock.Text = "Ready: " + release.DisplayName;
             }
             catch (Exception exception)
@@ -89,9 +91,20 @@ namespace MiSTerCast
                 Password = PasswordBox.Password,
                 MisterBinaryPath = MisterBinaryPathTextBox.Text.Trim(),
                 GroovyRbfPath = GroovyRbfPathTextBox.Text.Trim(),
-                ForceRedeploy = ForceRedeployCheckBox.IsChecked == true
+                ForceRedeploy = ForceRedeployCheckBox.IsChecked == true,
+                ReleaseManifest = CreateReleaseManifest()
             };
             DialogResult = true;
+        }
+
+        private GroovyTargetManifest CreateReleaseManifest()
+        {
+            if (downloadedRelease != null &&
+                String.Equals(MisterBinaryPathTextBox.Text.Trim(), downloadedRelease.MisterBinaryPath, StringComparison.OrdinalIgnoreCase) &&
+                String.Equals(GroovyRbfPathTextBox.Text.Trim(), downloadedRelease.GroovyRbfPath, StringComparison.OrdinalIgnoreCase))
+                return GroovyTargetManifest.FromRelease(downloadedRelease);
+
+            return GroovyTargetManifest.FromLocalFiles(MisterBinaryPathTextBox.Text.Trim(), GroovyRbfPathTextBox.Text.Trim());
         }
     }
 }

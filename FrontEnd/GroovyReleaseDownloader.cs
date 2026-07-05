@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace MiSTerCast
 {
-    class GroovyReleaseInfo
+    public class GroovyReleaseInfo
     {
         public string TagName { get; set; }
         public string Name { get; set; }

@@ -34,17 +34,9 @@ namespace MiSTerCast
             string[] hostKeyIds = await ScanHostKeyIdsAsync(config.Target, log);
 
             Log(log, "Checking target for existing Groovy files...");
-            CommandResult inventoryResult = await RunPlinkAsync(plinkPath, config, GroovyTargetConfigurator.BuildInventoryCommand(), hostKeyIds);
-            if (inventoryResult.ExitCode != 0 &&
-                hostKeyIds.Length == 0 &&
-                TryParseMissingHostKeyId(CombineProcessOutput(inventoryResult), out string promptedHostKeyId))
-            {
-                hostKeyIds = new[] { promptedHostKeyId };
-                Log(log, "Read SSH host key fingerprint from PuTTY prompt; retrying target check.");
-                inventoryResult = await RunPlinkAsync(plinkPath, config, GroovyTargetConfigurator.BuildInventoryCommand(), hostKeyIds);
-            }
-            EnsureSuccess("Target check failed", inventoryResult);
-            GroovyTargetInventory inventory = GroovyTargetConfigurator.ParseInventoryOutput(inventoryResult.StandardOutput);
+            InventoryReadResult inventoryResult = await ReadInventoryAsync(plinkPath, config, hostKeyIds, log);
+            hostKeyIds = inventoryResult.HostKeyIds;
+            GroovyTargetInventory inventory = inventoryResult.Inventory;
             Log(log, inventory.HasMisterBinary
                 ? "Found MiSTer_groovy on target: " + inventory.MisterBinaryPath
                 : "MiSTer_groovy not found on target.");
@@ -81,6 +73,8 @@ namespace MiSTerCast
 
             await RunRequiredPlinkAsync(plinkPath, config, "Updating MiSTer.ini", GroovyTargetConfigurator.BuildEnsureIniCommand(plan.MisterMainName), log, hostKeyIds);
             await RunRequiredPlinkAsync(plinkPath, config, "Syncing target", "chmod +x " + GroovyTargetConfigurator.QuoteRemote(plan.RemoteMisterBinaryPath) + " 2>/dev/null || true; sync", log, hostKeyIds);
+            if ((plan.UploadMisterBinary || plan.UploadGroovyRbf) && BuildManifestFromConfig(config) != null)
+                await RunRequiredPlinkAsync(plinkPath, config, "Writing MiSTerCast release marker", GroovyTargetManifest.BuildWriteCommand(BuildManifestFromConfig(config)), log, hostKeyIds);
             await RunRequiredPlinkAsync(plinkPath, config, "Launching Groovy core", GroovyTargetConfigurator.BuildLaunchCommand(plan.RemoteGroovyRbfPath), log, hostKeyIds);
 
             return new GroovyTargetDeploymentResult
@@ -88,6 +82,89 @@ namespace MiSTerCast
                 Inventory = inventory,
                 Plan = plan
             };
+        }
+
+        public async Task<GroovyTargetStatus> GetTargetStatusAsync(GroovyTargetDeploymentConfig config, Action<string, bool> log)
+        {
+            if (config == null)
+                throw new ArgumentNullException("config");
+
+            string plinkPath = FindTool("plink.exe");
+            if (String.IsNullOrWhiteSpace(plinkPath))
+                throw new InvalidOperationException("plink.exe was not found. Install PuTTY or add plink.exe to PATH.");
+
+            string[] hostKeyIds = await ScanHostKeyIdsAsync(config.Target, log);
+            InventoryReadResult inventoryResult = await ReadInventoryAsync(plinkPath, config, hostKeyIds, log);
+            GroovyTargetManifest manifest = await ReadManifestAsync(plinkPath, config, inventoryResult.HostKeyIds);
+            return new GroovyTargetStatus
+            {
+                Inventory = inventoryResult.Inventory,
+                Manifest = manifest
+            };
+        }
+
+        public async Task<GroovyTargetStatus> LaunchExistingAsync(GroovyTargetDeploymentConfig config, Action<string, bool> log)
+        {
+            if (config == null)
+                throw new ArgumentNullException("config");
+
+            string plinkPath = FindTool("plink.exe");
+            if (String.IsNullOrWhiteSpace(plinkPath))
+                throw new InvalidOperationException("plink.exe was not found. Install PuTTY or add plink.exe to PATH.");
+
+            string[] hostKeyIds = await ScanHostKeyIdsAsync(config.Target, log);
+            InventoryReadResult inventoryResult = await ReadInventoryAsync(plinkPath, config, hostKeyIds, log);
+            GroovyTargetInventory inventory = inventoryResult.Inventory;
+            GroovyTargetManifest manifest = await ReadManifestAsync(plinkPath, config, inventoryResult.HostKeyIds);
+            var status = new GroovyTargetStatus
+            {
+                Inventory = inventory,
+                Manifest = manifest
+            };
+
+            if (!inventory.HasMisterBinary || !inventory.HasGroovyRbf)
+                return status;
+
+            GroovyTargetDeploymentPlan plan = GroovyTargetConfigurator.CreateDeploymentPlan(inventory, false);
+            await RunRequiredPlinkAsync(plinkPath, config, "Updating MiSTer.ini", GroovyTargetConfigurator.BuildEnsureIniCommand(plan.MisterMainName), log, inventoryResult.HostKeyIds);
+            await RunRequiredPlinkAsync(plinkPath, config, "Syncing target", "chmod +x " + GroovyTargetConfigurator.QuoteRemote(plan.RemoteMisterBinaryPath) + " 2>/dev/null || true; sync", log, inventoryResult.HostKeyIds);
+            await RunRequiredPlinkAsync(plinkPath, config, "Launching Groovy core", GroovyTargetConfigurator.BuildLaunchCommand(plan.RemoteGroovyRbfPath), log, inventoryResult.HostKeyIds);
+            return status;
+        }
+
+        private async Task<InventoryReadResult> ReadInventoryAsync(string plinkPath, GroovyTargetDeploymentConfig config, string[] hostKeyIds, Action<string, bool> log)
+        {
+            CommandResult inventoryResult = await RunPlinkAsync(plinkPath, config, GroovyTargetConfigurator.BuildInventoryCommand(), hostKeyIds);
+            if (inventoryResult.ExitCode != 0 &&
+                hostKeyIds.Length == 0 &&
+                TryParseMissingHostKeyId(CombineProcessOutput(inventoryResult), out string promptedHostKeyId))
+            {
+                hostKeyIds = new[] { promptedHostKeyId };
+                Log(log, "Read SSH host key fingerprint from PuTTY prompt; retrying target check.");
+                inventoryResult = await RunPlinkAsync(plinkPath, config, GroovyTargetConfigurator.BuildInventoryCommand(), hostKeyIds);
+            }
+
+            EnsureSuccess("Target check failed", inventoryResult);
+            return new InventoryReadResult
+            {
+                Inventory = GroovyTargetConfigurator.ParseInventoryOutput(inventoryResult.StandardOutput),
+                HostKeyIds = hostKeyIds
+            };
+        }
+
+        private async Task<GroovyTargetManifest> ReadManifestAsync(string plinkPath, GroovyTargetDeploymentConfig config, IEnumerable<string> hostKeyIds)
+        {
+            CommandResult result = await RunPlinkAsync(plinkPath, config, GroovyTargetManifest.BuildReadCommand(), hostKeyIds);
+            if (result.ExitCode != 0)
+                return null;
+            return GroovyTargetManifest.Parse(result.StandardOutput);
+        }
+
+        private static GroovyTargetManifest BuildManifestFromConfig(GroovyTargetDeploymentConfig config)
+        {
+            if (config == null)
+                return null;
+            return config.ReleaseManifest ?? GroovyTargetManifest.FromLocalFiles(config.MisterBinaryPath, config.GroovyRbfPath);
         }
 
         private async Task RunRequiredPlinkAsync(string plinkPath, GroovyTargetDeploymentConfig config, string label, string remoteCommand, Action<string, bool> log, IEnumerable<string> hostKeyIds = null)
@@ -358,5 +435,11 @@ namespace MiSTerCast
         public int ExitCode { get; set; }
         public string StandardOutput { get; set; }
         public string StandardError { get; set; }
+    }
+
+    class InventoryReadResult
+    {
+        public GroovyTargetInventory Inventory { get; set; }
+        public string[] HostKeyIds { get; set; }
     }
 }

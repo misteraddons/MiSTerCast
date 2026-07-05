@@ -112,8 +112,10 @@ namespace MiSTerCast
 "@ | Set-Content -LiteralPath $testSource -Encoding UTF8
 
 & $csc /nologo /target:exe /out:$testExe `
+    (Join-Path $repoRoot "FrontEnd\GroovyReleaseDownloader.cs") `
     (Join-Path $repoRoot "FrontEnd\GroovyTargetConfigurator.cs") `
     (Join-Path $repoRoot "FrontEnd\GroovyTargetDeployer.cs") `
+    (Join-Path $repoRoot "FrontEnd\GroovyTargetManifest.cs") `
     $testSource
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE

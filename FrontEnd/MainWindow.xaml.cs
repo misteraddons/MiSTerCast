@@ -376,7 +376,6 @@ namespace MiSTerCast
 
             try
             {
-                EnablePreviewCheckBox.IsChecked = false;
                 StreamStatusTextBlock.Text = "Status: Checking Groovy_MiSTer...";
                 var probe = await GroovyMisterProbe.ProbeAsync(target, 1000);
                 if (!probe.Success)

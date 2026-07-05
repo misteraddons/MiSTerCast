@@ -1022,6 +1022,12 @@ namespace MiSTerCast
 
         private void AutofillModelineButton_Click(object sender, RoutedEventArgs e)
         {
+            if (modelines == null || modelines.Count == 0)
+            {
+                Log("Auto fill failed: no modeline presets are loaded.", true);
+                return;
+            }
+
             ushort hactive;
             ushort vactive;
             if (!ushort.TryParse(hactiveTextBox.Text, out hactive) || !ushort.TryParse(vactiveTextBox.Text, out vactive))
@@ -1098,7 +1104,8 @@ namespace MiSTerCast
             List<Modeline> newModeLines = new List<Modeline>();
             try
             {
-                List<string> lines = new List<string>(File.ReadAllLines("modelines.dat"));
+                string modelinesPath = ModelineFile.ResolvePath(AppDomain.CurrentDomain.BaseDirectory, Directory.GetCurrentDirectory());
+                List<string> lines = new List<string>(File.ReadAllLines(modelinesPath));
 
                 for (int i = 0; i < lines.Count; i++)
                 {
@@ -1189,6 +1196,7 @@ namespace MiSTerCast
             }
             catch (Exception e)
             {
+                modelines = new List<Modeline>();
                 Log("Failed to read modelines.dat. " + e.Message, true);
             }
         }
@@ -1197,6 +1205,9 @@ namespace MiSTerCast
         {
             ModelinePresetsBox.Items.Clear();
             ModelinePresetsBox.Items.Add("Custom");
+            if (modelines == null)
+                modelines = new List<Modeline>();
+
             foreach (Modeline modeline in modelines)
             {
                 ModelinePresetsBox.Items.Add(modeline.name);

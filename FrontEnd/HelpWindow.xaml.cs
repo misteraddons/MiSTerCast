@@ -16,9 +16,10 @@ namespace MiSTerCast
         public HelpWindow()
         {
             InitializeComponent();
+            string readmePath = BundledFile.ResolvePath("README.txt", AppDomain.CurrentDomain.BaseDirectory, Directory.GetCurrentDirectory());
             TextBlock textBlock = (TextBlock)XamlReader.Parse(
                 "<TextBlock xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\" xml:space=\"preserve\" TextWrapping=\"Wrap\"  Margin=\"10 10 10 10\">" +
-                File.ReadAllText("README.txt") + "</TextBlock>");
+                File.ReadAllText(readmePath) + "</TextBlock>");
 
             foreach(Inline inline in textBlock.Inlines)
             {

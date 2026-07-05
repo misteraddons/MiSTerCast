@@ -90,6 +90,9 @@ namespace MiSTerCast
                 parsedHostKey != "SHA256:FqNJOsj3FLUoMQxgn+cqGoXvVfENmVK4QFoSCMKl2lU")
                 return Fail("PuTTY missing-host-key prompt should provide a retryable host key");
 
+            if (GroovyTargetDeployer.BuildRequiredCommandStartLog("Launching Groovy core") != "Launching Groovy core...")
+                return Fail("deploy log should make the core launch step visible");
+
             return 0;
         }
 

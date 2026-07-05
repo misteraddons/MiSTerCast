@@ -55,7 +55,7 @@ namespace MiSTerCast
             GroovyTargetDeploymentPlan plan = GroovyTargetConfigurator.CreateDeploymentPlan(inventory, config.ForceRedeploy);
             GroovyTargetConfigurator.ValidateDeploymentConfig(config, plan);
 
-            await RunRequiredPlinkAsync(plinkPath, config, "Preparing target folders", "mkdir -p /media/fat/_Utility", hostKeyIds);
+            await RunRequiredPlinkAsync(plinkPath, config, "Preparing target folders", "mkdir -p /media/fat/_Utility", log, hostKeyIds);
 
             if (plan.UploadMisterBinary)
             {
@@ -79,9 +79,9 @@ namespace MiSTerCast
                 Log(log, "Skipping Groovy RBF upload; target already has it.");
             }
 
-            await RunRequiredPlinkAsync(plinkPath, config, "Updating MiSTer.ini", GroovyTargetConfigurator.BuildEnsureIniCommand(plan.MisterMainName), hostKeyIds);
-            await RunRequiredPlinkAsync(plinkPath, config, "Syncing target", "chmod +x " + GroovyTargetConfigurator.QuoteRemote(plan.RemoteMisterBinaryPath) + " 2>/dev/null || true; sync", hostKeyIds);
-            await RunRequiredPlinkAsync(plinkPath, config, "Launching Groovy core", GroovyTargetConfigurator.BuildLaunchCommand(plan.RemoteGroovyRbfPath), hostKeyIds);
+            await RunRequiredPlinkAsync(plinkPath, config, "Updating MiSTer.ini", GroovyTargetConfigurator.BuildEnsureIniCommand(plan.MisterMainName), log, hostKeyIds);
+            await RunRequiredPlinkAsync(plinkPath, config, "Syncing target", "chmod +x " + GroovyTargetConfigurator.QuoteRemote(plan.RemoteMisterBinaryPath) + " 2>/dev/null || true; sync", log, hostKeyIds);
+            await RunRequiredPlinkAsync(plinkPath, config, "Launching Groovy core", GroovyTargetConfigurator.BuildLaunchCommand(plan.RemoteGroovyRbfPath), log, hostKeyIds);
 
             return new GroovyTargetDeploymentResult
             {
@@ -90,8 +90,9 @@ namespace MiSTerCast
             };
         }
 
-        private async Task RunRequiredPlinkAsync(string plinkPath, GroovyTargetDeploymentConfig config, string label, string remoteCommand, IEnumerable<string> hostKeyIds = null)
+        private async Task RunRequiredPlinkAsync(string plinkPath, GroovyTargetDeploymentConfig config, string label, string remoteCommand, Action<string, bool> log, IEnumerable<string> hostKeyIds = null)
         {
+            Log(log, BuildRequiredCommandStartLog(label));
             CommandResult result = await RunPlinkAsync(plinkPath, config, remoteCommand, hostKeyIds);
             EnsureSuccess(label + " failed", result);
         }
@@ -122,6 +123,11 @@ namespace MiSTerCast
                 "-batch -scp -pw " + QuoteArgument(config.Password ?? "") +
                 " " + QuoteArgument(localPath) +
                 " " + QuoteArgument(remote);
+        }
+
+        public static string BuildRequiredCommandStartLog(string label)
+        {
+            return (String.IsNullOrWhiteSpace(label) ? "Running target command" : label) + "...";
         }
 
         private Task<CommandResult> RunProcessAsync(string fileName, string arguments)

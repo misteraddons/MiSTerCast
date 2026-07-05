@@ -212,11 +212,15 @@ namespace MiSTerCast
             {
                 var deployer = new GroovyTargetDeployer();
                 await deployer.ConfigureAndLaunchAsync(config, Log);
-                StreamStatusTextBlock.Text = "Status: Target configured; waiting for Groovy_MiSTer...";
-                Log("Groovy target configured. Waiting for UDP ACK...");
+                StreamStatusTextBlock.Text = "Status: Groovy core launched; waiting for UDP ACK...";
+                Log("Groovy core launch command sent. Waiting for UDP ACK...");
 
-                await Task.Delay(1000);
-                var result = await GroovyMisterProbe.ProbeAsync(config.Target, 3000);
+                var result = await GroovyMisterProbe.ProbeUntilAsync(
+                    config.Target,
+                    GroovyMisterProbe.DefaultPostLaunchProbeTimeoutMilliseconds,
+                    GroovyMisterProbe.DefaultPostLaunchAttemptTimeoutMilliseconds,
+                    GroovyMisterProbe.DefaultPostLaunchRetryDelayMilliseconds,
+                    Log);
                 if (result.Success)
                 {
                     StreamStatusTextBlock.Text = String.Format(

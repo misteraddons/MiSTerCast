@@ -107,7 +107,7 @@ namespace MiSTerCast
 
             if (stats.streaming != 0)
             {
-                StreamStatusTextBlock.Text = StreamStatusFormatter.Format(stats);
+                StreamStatusTextBlock.Text = StreamStatusFormatter.Format(stats, EnableAudioCheckBox.IsChecked == true);
             }
             else if (stats.capturing != 0)
             {

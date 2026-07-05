@@ -4,9 +4,9 @@ namespace MiSTerCast
 {
     static class StreamStatusFormatter
     {
-        public static string Format(MiSTerCastInterop.StreamStats stats)
+        public static string Format(MiSTerCastInterop.StreamStats stats, bool audioRequested)
         {
-            string audio = stats.fpgaAudio != 0 ? "MiSTer audio on" : "MiSTer audio off";
+            string audio = DescribeAudioState(audioRequested, stats.fpgaAudio != 0);
             string sync = stats.fpgaSynced != 0 ? "MiSTer synced" : "MiSTer sync pending";
             return String.Format(
                 "Status: Streaming | PC frame {0} | {1}, {2} | {3} | raster line {4}",
@@ -15,6 +15,13 @@ namespace MiSTerCast
                 DescribeFrameLag(stats.framesSubmitted, stats.fpgaFrame),
                 audio,
                 stats.fpgaVCount);
+        }
+
+        private static string DescribeAudioState(bool audioRequested, bool fpgaAudio)
+        {
+            string pc = audioRequested ? "PC audio requested" : "PC audio disabled";
+            string mister = fpgaAudio ? "MiSTer on" : "MiSTer off";
+            return String.Format("{0}, {1}", pc, mister);
         }
 
         private static string DescribeFrameLag(UInt32 framesSubmitted, UInt32 fpgaFrame)

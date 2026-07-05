@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -28,8 +31,10 @@ namespace MiSTerCast
             if (String.IsNullOrWhiteSpace(pscpPath))
                 throw new InvalidOperationException("pscp.exe was not found. Install PuTTY or add pscp.exe to PATH.");
 
+            string[] hostKeyIds = await ScanHostKeyIdsAsync(config.Target, log);
+
             Log(log, "Checking target for existing Groovy files...");
-            CommandResult inventoryResult = await RunPlinkAsync(plinkPath, config, GroovyTargetConfigurator.BuildInventoryCommand());
+            CommandResult inventoryResult = await RunPlinkAsync(plinkPath, config, GroovyTargetConfigurator.BuildInventoryCommand(), hostKeyIds);
             EnsureSuccess("Target check failed", inventoryResult);
             GroovyTargetInventory inventory = GroovyTargetConfigurator.ParseInventoryOutput(inventoryResult.StandardOutput);
             Log(log, inventory.HasMisterBinary
@@ -42,12 +47,12 @@ namespace MiSTerCast
             GroovyTargetDeploymentPlan plan = GroovyTargetConfigurator.CreateDeploymentPlan(inventory, config.ForceRedeploy);
             GroovyTargetConfigurator.ValidateDeploymentConfig(config, plan);
 
-            await RunRequiredPlinkAsync(plinkPath, config, "Preparing target folders", "mkdir -p /media/fat/_Utility");
+            await RunRequiredPlinkAsync(plinkPath, config, "Preparing target folders", "mkdir -p /media/fat/_Utility", hostKeyIds);
 
             if (plan.UploadMisterBinary)
             {
-                Log(log, "Uploading MiSTer_groovy...");
-                CommandResult result = await RunPscpAsync(pscpPath, config, config.MisterBinaryPath, plan.RemoteMisterBinaryPath);
+                Log(log, "Uploading MiSTer_groovy to " + plan.RemoteMisterBinaryPath + "...");
+                CommandResult result = await RunPscpAsync(pscpPath, config, config.MisterBinaryPath, plan.RemoteMisterBinaryPath, hostKeyIds);
                 EnsureSuccess("MiSTer_groovy upload failed", result);
             }
             else
@@ -58,7 +63,7 @@ namespace MiSTerCast
             if (plan.UploadGroovyRbf)
             {
                 Log(log, "Uploading Groovy RBF...");
-                CommandResult result = await RunPscpAsync(pscpPath, config, config.GroovyRbfPath, plan.RemoteGroovyRbfPath);
+                CommandResult result = await RunPscpAsync(pscpPath, config, config.GroovyRbfPath, plan.RemoteGroovyRbfPath, hostKeyIds);
                 EnsureSuccess("Groovy RBF upload failed", result);
             }
             else
@@ -66,9 +71,9 @@ namespace MiSTerCast
                 Log(log, "Skipping Groovy RBF upload; target already has it.");
             }
 
-            await RunRequiredPlinkAsync(plinkPath, config, "Updating MiSTer.ini", GroovyTargetConfigurator.BuildEnsureIniCommand(plan.MisterMainName));
-            await RunRequiredPlinkAsync(plinkPath, config, "Syncing target", "chmod +x " + GroovyTargetConfigurator.QuoteRemote(plan.RemoteMisterBinaryPath) + " 2>/dev/null || true; sync");
-            await RunRequiredPlinkAsync(plinkPath, config, "Launching Groovy core", GroovyTargetConfigurator.BuildLaunchCommand(plan.RemoteGroovyRbfPath));
+            await RunRequiredPlinkAsync(plinkPath, config, "Updating MiSTer.ini", GroovyTargetConfigurator.BuildEnsureIniCommand(plan.MisterMainName), hostKeyIds);
+            await RunRequiredPlinkAsync(plinkPath, config, "Syncing target", "chmod +x " + GroovyTargetConfigurator.QuoteRemote(plan.RemoteMisterBinaryPath) + " 2>/dev/null || true; sync", hostKeyIds);
+            await RunRequiredPlinkAsync(plinkPath, config, "Launching Groovy core", GroovyTargetConfigurator.BuildLaunchCommand(plan.RemoteGroovyRbfPath), hostKeyIds);
 
             return new GroovyTargetDeploymentResult
             {
@@ -77,28 +82,38 @@ namespace MiSTerCast
             };
         }
 
-        private async Task RunRequiredPlinkAsync(string plinkPath, GroovyTargetDeploymentConfig config, string label, string remoteCommand)
+        private async Task RunRequiredPlinkAsync(string plinkPath, GroovyTargetDeploymentConfig config, string label, string remoteCommand, IEnumerable<string> hostKeyIds = null)
         {
-            CommandResult result = await RunPlinkAsync(plinkPath, config, remoteCommand);
+            CommandResult result = await RunPlinkAsync(plinkPath, config, remoteCommand, hostKeyIds);
             EnsureSuccess(label + " failed", result);
         }
 
-        private Task<CommandResult> RunPlinkAsync(string plinkPath, GroovyTargetDeploymentConfig config, string remoteCommand)
+        private Task<CommandResult> RunPlinkAsync(string plinkPath, GroovyTargetDeploymentConfig config, string remoteCommand, IEnumerable<string> hostKeyIds)
         {
-            string arguments = "-ssh -batch -l " + QuoteArgument(config.Username) +
+            return RunProcessAsync(plinkPath, BuildPlinkArguments(config, remoteCommand, hostKeyIds));
+        }
+
+        private Task<CommandResult> RunPscpAsync(string pscpPath, GroovyTargetDeploymentConfig config, string localPath, string remotePath, IEnumerable<string> hostKeyIds)
+        {
+            return RunProcessAsync(pscpPath, BuildPscpArguments(config, localPath, remotePath, hostKeyIds));
+        }
+
+        public static string BuildPlinkArguments(GroovyTargetDeploymentConfig config, string remoteCommand, IEnumerable<string> hostKeyIds)
+        {
+            return "-ssh " + BuildHostKeyArguments(hostKeyIds) +
+                "-batch -l " + QuoteArgument(config.Username) +
                 " -pw " + QuoteArgument(config.Password ?? "") +
                 " " + QuoteArgument(config.Target) +
                 " " + QuoteArgument(remoteCommand);
-            return RunProcessAsync(plinkPath, arguments);
         }
 
-        private Task<CommandResult> RunPscpAsync(string pscpPath, GroovyTargetDeploymentConfig config, string localPath, string remotePath)
+        public static string BuildPscpArguments(GroovyTargetDeploymentConfig config, string localPath, string remotePath, IEnumerable<string> hostKeyIds)
         {
             string remote = config.Username + "@" + config.Target + ":" + remotePath;
-            string arguments = "-batch -scp -pw " + QuoteArgument(config.Password ?? "") +
+            return BuildHostKeyArguments(hostKeyIds) +
+                "-batch -scp -pw " + QuoteArgument(config.Password ?? "") +
                 " " + QuoteArgument(localPath) +
                 " " + QuoteArgument(remote);
-            return RunProcessAsync(pscpPath, arguments);
         }
 
         private Task<CommandResult> RunProcessAsync(string fileName, string arguments)
@@ -145,6 +160,73 @@ namespace MiSTerCast
         {
             if (log != null)
                 log(message, false);
+        }
+
+        private async Task<string[]> ScanHostKeyIdsAsync(string target, Action<string, bool> log)
+        {
+            string sshKeyscanPath = FindTool("ssh-keyscan.exe");
+            if (String.IsNullOrWhiteSpace(sshKeyscanPath))
+            {
+                Log(log, "ssh-keyscan.exe not found; using PuTTY's cached host keys.");
+                return new string[0];
+            }
+
+            CommandResult result = await RunProcessAsync(sshKeyscanPath, "-T 5 " + QuoteArgument(target));
+            string[] hostKeyIds = ParseSshKeyScanHostKeyIds(result.StandardOutput).ToArray();
+            if (hostKeyIds.Length > 0)
+                Log(log, "Read SSH host key fingerprint from target.");
+            else
+                Log(log, "Could not read SSH host key fingerprint; using PuTTY's cached host keys.");
+            return hostKeyIds;
+        }
+
+        public static IEnumerable<string> ParseSshKeyScanHostKeyIds(string keyscanOutput)
+        {
+            if (String.IsNullOrWhiteSpace(keyscanOutput))
+                yield break;
+
+            string[] lines = keyscanOutput.Replace("\r\n", "\n").Split('\n');
+            foreach (string rawLine in lines)
+            {
+                string line = rawLine.Trim();
+                if (line.Length == 0 || line.StartsWith("#", StringComparison.Ordinal))
+                    continue;
+
+                string[] parts = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 3)
+                    continue;
+
+                byte[] keyBlob;
+                try
+                {
+                    keyBlob = Convert.FromBase64String(parts[2]);
+                }
+                catch (FormatException)
+                {
+                    continue;
+                }
+
+                using (SHA256 sha256 = SHA256.Create())
+                {
+                    string fingerprint = Convert.ToBase64String(sha256.ComputeHash(keyBlob)).TrimEnd('=');
+                    yield return "SHA256:" + fingerprint;
+                }
+            }
+        }
+
+        private static string BuildHostKeyArguments(IEnumerable<string> hostKeyIds)
+        {
+            if (hostKeyIds == null)
+                return "";
+
+            var builder = new StringBuilder();
+            foreach (string hostKeyId in hostKeyIds.Where(h => !String.IsNullOrWhiteSpace(h)).Distinct())
+            {
+                builder.Append("-hostkey ");
+                builder.Append(QuoteArgument(hostKeyId));
+                builder.Append(' ');
+            }
+            return builder.ToString();
         }
 
         private static string FindTool(string toolName)

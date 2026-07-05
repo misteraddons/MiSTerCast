@@ -75,14 +75,16 @@ namespace MiSTerCast
             return inventory;
         }
 
-        public static GroovyTargetDeploymentPlan CreateDeploymentPlan(GroovyTargetInventory inventory, bool forceRedeploy)
+        public static GroovyTargetDeploymentPlan CreateDeploymentPlan(GroovyTargetInventory inventory, bool forceRedeploy, string deploymentId = null)
         {
             if (inventory == null)
                 inventory = new GroovyTargetInventory();
 
             bool uploadMisterBinary = forceRedeploy || !inventory.HasMisterBinary;
             bool uploadGroovyRbf = forceRedeploy || !inventory.HasGroovyRbf;
-            string remoteMisterBinaryPath = uploadMisterBinary ? CanonicalMisterBinaryPath : inventory.MisterBinaryPath;
+            string remoteMisterBinaryPath = uploadMisterBinary
+                ? GetUploadMisterBinaryPath(inventory, forceRedeploy, deploymentId)
+                : inventory.MisterBinaryPath;
             string remoteGroovyRbfPath = uploadGroovyRbf ? CanonicalGroovyRbfPath : inventory.GroovyRbfPath;
             string misterMainName = RemoteFileName(remoteMisterBinaryPath);
             if (String.IsNullOrWhiteSpace(misterMainName))
@@ -96,6 +98,29 @@ namespace MiSTerCast
                 RemoteGroovyRbfPath = remoteGroovyRbfPath,
                 MisterMainName = misterMainName
             };
+        }
+
+        private static string GetUploadMisterBinaryPath(GroovyTargetInventory inventory, bool forceRedeploy, string deploymentId)
+        {
+            if (!forceRedeploy || inventory == null || !inventory.HasMisterBinary)
+                return CanonicalMisterBinaryPath;
+
+            if (String.IsNullOrWhiteSpace(deploymentId))
+                deploymentId = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+
+            return "/media/fat/MiSTer_groovy_mistercast_" + SanitizeRemoteNameFragment(deploymentId);
+        }
+
+        private static string SanitizeRemoteNameFragment(string value)
+        {
+            if (String.IsNullOrWhiteSpace(value))
+                return "deploy";
+
+            char[] chars = value
+                .Select(c => Char.IsLetterOrDigit(c) || c == '_' || c == '-' ? c : '_')
+                .ToArray();
+            string sanitized = new string(chars).Trim('_');
+            return String.IsNullOrWhiteSpace(sanitized) ? "deploy" : sanitized;
         }
 
         public static string BuildEnsureIniCommand(string misterMainName)

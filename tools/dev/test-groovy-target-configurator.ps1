@@ -48,10 +48,26 @@ namespace MiSTerCast
             if (missingPlan.RemoteGroovyRbfPath != "/media/fat/_Utility/Groovy.rbf")
                 return Fail("missing Groovy RBF should deploy to canonical path");
 
+            var forcedExistingPlan = GroovyTargetConfigurator.CreateDeploymentPlan(inventory, true, "test");
+            if (!forcedExistingPlan.UploadMisterBinary)
+                return Fail("forced redeploy should upload MiSTer_groovy");
+            if (forcedExistingPlan.RemoteMisterBinaryPath != "/media/fat/MiSTer_groovy_mistercast_test")
+                return Fail("forced redeploy with existing binary should use a non-running sidecar path");
+            if (forcedExistingPlan.MisterMainName != "MiSTer_groovy_mistercast_test")
+                return Fail("MiSTer.ini should point at the forced redeploy sidecar");
+
             string iniCommand = GroovyTargetConfigurator.BuildEnsureIniCommand("mister_groovy");
             AssertContains(iniCommand, "[Groovy]", "MiSTer.ini command must create the Groovy section");
             AssertContains(iniCommand, "main=", "MiSTer.ini command must set main");
             AssertContains(iniCommand, ".mistercast.bak", "MiSTer.ini command must create a backup");
+
+            string puttyArgs = GroovyTargetDeployer.BuildPlinkArguments(
+                new GroovyTargetDeploymentConfig { Target = "MiSTer", Username = "root", Password = "1" },
+                "true",
+                new[] { "SHA256:abc123", "SHA256:def456" });
+            AssertContains(puttyArgs, "-hostkey SHA256:abc123", "PuTTY commands must include scanned host keys");
+            AssertContains(puttyArgs, "-hostkey SHA256:def456", "PuTTY commands must allow multiple host keys");
+            AssertContains(puttyArgs, "-batch", "PuTTY commands must stay noninteractive");
 
             return 0;
         }
@@ -73,6 +89,7 @@ namespace MiSTerCast
 
 & $csc /nologo /target:exe /out:$testExe `
     (Join-Path $repoRoot "FrontEnd\GroovyTargetConfigurator.cs") `
+    (Join-Path $repoRoot "FrontEnd\GroovyTargetDeployer.cs") `
     $testSource
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE

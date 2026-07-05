@@ -137,6 +137,7 @@ namespace MiSTerCast
             ToggleStreamButton.Content = streaming ? "Stop Stream" : "Start Stream";
             CaptureSourceBox.IsEnabled = !streaming;
             EnableAudioCheckBox.IsEnabled = !streaming;
+            TestTargetButton.IsEnabled = !streaming;
             if (!streaming)
                 ApplyModelineButton.IsEnabled = false;
         }
@@ -146,7 +147,7 @@ namespace MiSTerCast
             switch (error)
             {
                 case 23:
-                    return "no UDP ACK from MiSTer";
+                    return "no UDP ACK from MiSTer; use Test Target";
                 case 100:
                     return "native stream thread error";
                 case 101:
@@ -155,6 +156,47 @@ namespace MiSTerCast
                     return "startup failed";
                 default:
                     return "native error " + error;
+            }
+        }
+
+        private async void TestTargetButton_Click(object sender, RoutedEventArgs e)
+        {
+            TestTargetButton.IsEnabled = false;
+            StreamStatusTextBlock.Text = "Status: Testing target...";
+
+            try
+            {
+                var result = await GroovyMisterProbe.ProbeAsync(TargetIpAddresTextBox.Text);
+                if (result.Success)
+                {
+                    StreamStatusTextBlock.Text = String.Format(
+                        "Status: Groovy_MiSTer detected at {0}:{1}",
+                        result.Address,
+                        result.Port);
+                    Log(String.Format(
+                        "Groovy_MiSTer detected at {0}:{1}. frame={2}, vcount={3}, status=0x{4:X2}",
+                        result.Address,
+                        result.Port,
+                        result.Frame,
+                        result.VCount,
+                        result.StatusBits));
+                }
+                else
+                {
+                    StreamStatusTextBlock.Text = "Status: Target test failed - " + result.Message;
+                    Log(String.Format("Target test failed for {0}:{1}: {2}", result.Address, result.Port, result.Message), true);
+                    Log("Check that Groovy.rbf is loaded, MiSTer_groovy is installed and configured in MiSTer.ini, UDP 32100 is reachable, and a direct gigabit connection is preferred.", true);
+                }
+            }
+            catch (Exception exception)
+            {
+                StreamStatusTextBlock.Text = "Status: Target test failed";
+                Log("Target test failed: " + exception.Message, true);
+            }
+            finally
+            {
+                if (!isStreaming)
+                    TestTargetButton.IsEnabled = true;
             }
         }
 

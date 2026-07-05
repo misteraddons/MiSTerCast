@@ -11,6 +11,11 @@ The Microsoft VC++ x86 Redistributable is required. You can install it from here
 
 For audio, you will need to enable audio on the Groovy_MiSTer core.
 
+## Startup checks
+Use the Test Target button before starting a stream. A successful check means MiSTerCast received a Groovy_MiSTer ACK on UDP 32100.
+
+If you see no UDP ACK, check that Groovy.rbf is loaded, MiSTer_groovy is installed and configured in MiSTer.ini, UDP 32100 is reachable from Windows, and a direct gigabit connection is preferred.
+
 ## Known issues
 - Frames may be dropped or doubled due to sync with video signal.
 - At least 1-2 frames of latency.

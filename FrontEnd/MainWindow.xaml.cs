@@ -36,7 +36,6 @@ namespace MiSTerCast
         private bool isInitialized = false;
         private bool isStreaming = false;
         HelpWindow helpWindow = null;
-        const string lastSaveFilename = "lastsave.dat";
         string currentSaveFilename = null;
         private DispatcherTimer statusTimer;
 
@@ -293,13 +292,16 @@ namespace MiSTerCast
             if (helpWindow == null)
             {
                 helpWindow = new HelpWindow();
-                if (!File.Exists(lastSaveFilename))
+                string lastSavePath = AppStateFile.ResolveLastSavePath(AppDomain.CurrentDomain.BaseDirectory);
+                if (!File.Exists(lastSavePath))
                 {
                     // Show help the first time MiSTerCast is opened
                     helpWindow.Show();
                     try
                     {
-                        File.Create(lastSaveFilename);
+                        using (File.Create(lastSavePath))
+                        {
+                        }
                     }
                     catch (Exception exception)
                     {
@@ -311,7 +313,7 @@ namespace MiSTerCast
                     try
                     {
                         currentSaveFilename = null;
-                        using (StreamReader sr = File.OpenText(lastSaveFilename))
+                        using (StreamReader sr = File.OpenText(lastSavePath))
                         {
                             if (!sr.EndOfStream)
                             {
@@ -747,7 +749,8 @@ namespace MiSTerCast
             currentSaveFilename = fileName;
             try
             {
-                using (FileStream fs = File.OpenWrite(lastSaveFilename))
+                string lastSavePath = AppStateFile.ResolveLastSavePath(AppDomain.CurrentDomain.BaseDirectory);
+                using (FileStream fs = File.OpenWrite(lastSavePath))
                 {
                     using (StreamWriter sw = new StreamWriter(fs))
                     {

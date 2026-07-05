@@ -119,6 +119,11 @@ namespace MiSTerCast
                 actualPath = BundledFile.ResolvePath("README.txt", baseDir, currentDir);
                 if (!String.Equals(expectedReadmePath, actualPath, StringComparison.OrdinalIgnoreCase))
                     return Fail("README.txt should resolve from the executable directory before the current directory");
+
+                string expectedLastSavePath = Path.Combine(baseDir, "lastsave.dat");
+                actualPath = AppStateFile.ResolveLastSavePath(baseDir);
+                if (!String.Equals(expectedLastSavePath, actualPath, StringComparison.OrdinalIgnoreCase))
+                    return Fail("lastsave.dat should resolve from the executable directory");
             }
             finally
             {
@@ -139,6 +144,7 @@ namespace MiSTerCast
 "@ | Set-Content -LiteralPath $testSource -Encoding UTF8
 
 & $csc /nologo /target:exe /out:$testExe `
+    (Join-Path $repoRoot "FrontEnd\AppStateFile.cs") `
     (Join-Path $repoRoot "FrontEnd\Modeline.cs") `
     (Join-Path $repoRoot "FrontEnd\BundledFile.cs") `
     (Join-Path $repoRoot "FrontEnd\ModelineFile.cs") `

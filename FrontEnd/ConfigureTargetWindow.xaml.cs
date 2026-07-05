@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using Microsoft.Win32;
 
@@ -15,7 +16,7 @@ namespace MiSTerCast
             if (config == null)
                 config = new GroovyTargetDeploymentConfig();
 
-            TargetTextBox.Text = config.Target ?? "";
+            TargetComboBox.Text = config.Target ?? "";
             UsernameTextBox.Text = String.IsNullOrWhiteSpace(config.Username) ? GroovyTargetConfigurator.DefaultUsername : config.Username;
             PasswordBox.Password = config.Password ?? GroovyTargetConfigurator.DefaultPassword;
             MisterBinaryPathTextBox.Text = config.MisterBinaryPath ?? "";
@@ -70,9 +71,46 @@ namespace MiSTerCast
             }
         }
 
+        private async void ScanTargetsButton_Click(object sender, RoutedEventArgs e)
+        {
+            string currentTarget = TargetComboBox.Text;
+            ScanTargetsButton.IsEnabled = false;
+            ReleaseStatusTextBlock.Text = "Scanning network...";
+
+            try
+            {
+                List<NetworkTargetCandidate> candidates = await NetworkTargetScanner.ScanAsync((message, error) =>
+                {
+                    ReleaseStatusTextBlock.Text = message;
+                });
+
+                TargetComboBox.Items.Clear();
+                foreach (NetworkTargetCandidate candidate in candidates)
+                    TargetComboBox.Items.Add(candidate.DisplayText);
+
+                if (!String.IsNullOrWhiteSpace(currentTarget))
+                    TargetComboBox.Text = currentTarget;
+
+                ReleaseStatusTextBlock.Text = candidates.Count == 0
+                    ? "No SSH targets found."
+                    : "Found " + candidates.Count + " target" + (candidates.Count == 1 ? "." : "s.");
+                if (candidates.Count > 0)
+                    TargetComboBox.IsDropDownOpen = true;
+            }
+            catch (Exception exception)
+            {
+                ReleaseStatusTextBlock.Text = "Scan failed";
+                MessageBox.Show(this, exception.Message, "Scan Targets", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            finally
+            {
+                ScanTargetsButton.IsEnabled = true;
+            }
+        }
+
         private void DeployButton_Click(object sender, RoutedEventArgs e)
         {
-            if (String.IsNullOrWhiteSpace(TargetTextBox.Text))
+            if (String.IsNullOrWhiteSpace(TargetComboBox.Text))
             {
                 MessageBox.Show(this, "Target is required.", "Configure Target", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
@@ -86,7 +124,7 @@ namespace MiSTerCast
 
             DeploymentConfig = new GroovyTargetDeploymentConfig
             {
-                Target = TargetTextBox.Text.Trim(),
+                Target = NetworkTargetScanner.ExtractTargetValue(TargetComboBox.Text),
                 Username = UsernameTextBox.Text.Trim(),
                 Password = PasswordBox.Password,
                 MisterBinaryPath = MisterBinaryPathTextBox.Text.Trim(),

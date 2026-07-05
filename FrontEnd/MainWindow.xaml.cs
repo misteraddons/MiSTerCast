@@ -377,20 +377,15 @@ namespace MiSTerCast
             try
             {
                 StreamStatusTextBlock.Text = "Status: Checking Groovy_MiSTer...";
-                var probe = await GroovyMisterProbe.ProbeAsync(target, 1000);
-                if (!probe.Success)
+                bool ready = await EnsureGroovyReadyForStreamingAsync(target);
+                if (!ready)
                 {
-                    Log("Groovy_MiSTer is not responding; checking target setup...");
-                    bool ready = await EnsureGroovyReadyForStreamingAsync(target);
-                    if (!ready)
-                    {
-                        StreamStatusTextBlock.Text = "Status: Start Stream canceled";
-                        return;
-                    }
-
-                    if (!TryResolveTargetIpAddress(target, out ipAddress))
-                        return;
+                    StreamStatusTextBlock.Text = "Status: Start Stream canceled";
+                    return;
                 }
+
+                if (!TryResolveTargetIpAddress(target, out ipAddress))
+                    return;
 
                 if (MiSTerCastInterop.StartStream(ipAddress.ToString()))
                     SetStreamControls(true);

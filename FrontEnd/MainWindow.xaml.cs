@@ -107,15 +107,7 @@ namespace MiSTerCast
 
             if (stats.streaming != 0)
             {
-                string audio = stats.fpgaAudio != 0 ? "audio on" : "audio off";
-                string sync = stats.fpgaSynced != 0 ? "synced" : "sync pending";
-                StreamStatusTextBlock.Text = String.Format(
-                    "Status: Streaming | frame {0} | MiSTer frame {1} | vcount {2} | {3} | {4}",
-                    stats.framesSubmitted,
-                    stats.fpgaFrame,
-                    stats.fpgaVCount,
-                    audio,
-                    sync);
+                StreamStatusTextBlock.Text = StreamStatusFormatter.Format(stats);
             }
             else if (stats.capturing != 0)
             {

@@ -70,6 +70,12 @@ try {
     if ($null -eq $testButton) {
         throw "Test Target button not found."
     }
+
+    $configureButton = Find-ChildByName $window "Configure Target"
+    if ($null -eq $configureButton) {
+        throw "Configure Target button not found."
+    }
+
     $testButton.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
 
     $deadline = (Get-Date).AddSeconds(5)

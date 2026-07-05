@@ -12,6 +12,7 @@ using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using System.Globalization;
 using System.Net;
+using System.Threading.Tasks;
 using System.Windows.Threading;
 
 namespace MiSTerCast
@@ -130,6 +131,7 @@ namespace MiSTerCast
             CaptureSourceBox.IsEnabled = !streaming;
             EnableAudioCheckBox.IsEnabled = !streaming;
             TestTargetButton.IsEnabled = !streaming;
+            ConfigureTargetButton.IsEnabled = !streaming;
             if (!streaming)
                 ApplyModelineButton.IsEnabled = false;
         }
@@ -190,6 +192,78 @@ namespace MiSTerCast
                 if (!isStreaming)
                     TestTargetButton.IsEnabled = true;
             }
+        }
+
+        private async void ConfigureTargetButton_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new ConfigureTargetWindow(CreateDefaultTargetDeploymentConfig());
+            dialog.Owner = this;
+            if (dialog.ShowDialog() != true)
+                return;
+
+            var config = dialog.DeploymentConfig;
+            TargetIpAddresTextBox.Text = config.Target;
+            ConfigureTargetButton.IsEnabled = false;
+            TestTargetButton.IsEnabled = false;
+            ToggleStreamButton.IsEnabled = false;
+            StreamStatusTextBlock.Text = "Status: Configuring target...";
+
+            try
+            {
+                var deployer = new GroovyTargetDeployer();
+                await deployer.ConfigureAndLaunchAsync(config, Log);
+                StreamStatusTextBlock.Text = "Status: Target configured; waiting for Groovy_MiSTer...";
+                Log("Groovy target configured. Waiting for UDP ACK...");
+
+                await Task.Delay(1000);
+                var result = await GroovyMisterProbe.ProbeAsync(config.Target, 3000);
+                if (result.Success)
+                {
+                    StreamStatusTextBlock.Text = String.Format(
+                        "Status: Groovy_MiSTer detected at {0}:{1}",
+                        result.Address,
+                        result.Port);
+                    Log(String.Format(
+                        "Groovy_MiSTer detected at {0}:{1}. frame={2}, vcount={3}, status=0x{4:X2}",
+                        result.Address,
+                        result.Port,
+                        result.Frame,
+                        result.VCount,
+                        result.StatusBits));
+                }
+                else
+                {
+                    StreamStatusTextBlock.Text = "Status: Target configured; probe failed - " + result.Message;
+                    Log("Groovy target configured, but UDP probe failed: " + result.Message, true);
+                }
+            }
+            catch (Exception exception)
+            {
+                StreamStatusTextBlock.Text = "Status: Configure target failed";
+                Log("Configure target failed: " + exception.Message, true);
+            }
+            finally
+            {
+                ToggleStreamButton.IsEnabled = true;
+                if (!isStreaming)
+                {
+                    ConfigureTargetButton.IsEnabled = true;
+                    TestTargetButton.IsEnabled = true;
+                }
+            }
+        }
+
+        private GroovyTargetDeploymentConfig CreateDefaultTargetDeploymentConfig()
+        {
+            return new GroovyTargetDeploymentConfig
+            {
+                Target = TargetIpAddresTextBox.Text,
+                Username = GroovyTargetConfigurator.DefaultUsername,
+                Password = GroovyTargetConfigurator.DefaultPassword,
+                MisterBinaryPath = GroovyTargetConfigurator.FindDefaultMisterBinaryPath(),
+                GroovyRbfPath = GroovyTargetConfigurator.FindDefaultGroovyRbfPath(),
+                ForceRedeploy = false
+            };
         }
 
         void MainWindow_Closing(object sender, CancelEventArgs e)

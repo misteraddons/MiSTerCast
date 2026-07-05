@@ -88,6 +88,9 @@
     <Compile Include="GroovyTargetDeployer.cs" />
     <Compile Include="GroovyTargetManifest.cs" />
     <Compile Include="GroovyMisterProbe.cs" />
+    <Compile Include="MiSTerCastSettings.cs" />
+    <Compile Include="Modeline.cs" />
+    <Compile Include="ModelineValidator.cs" />
     <Compile Include="NetworkTargetScanner.cs" />
     <Compile Include="StreamStatusFormatter.cs" />
     <Compile Include="MainWindow.xaml.cs">

@@ -13,6 +13,7 @@ $testSource = Join-Path $env:TEMP "mistercast-groovy-target-configurator-test.cs
 $testExe = Join-Path $env:TEMP "mistercast-groovy-target-configurator-test.exe"
 @"
 using System;
+using System.Linq;
 
 namespace MiSTerCast
 {
@@ -68,6 +69,26 @@ namespace MiSTerCast
             AssertContains(puttyArgs, "-hostkey SHA256:abc123", "PuTTY commands must include scanned host keys");
             AssertContains(puttyArgs, "-hostkey SHA256:def456", "PuTTY commands must allow multiple host keys");
             AssertContains(puttyArgs, "-batch", "PuTTY commands must stay noninteractive");
+
+            string[] candidates = GroovyTargetDeployer.BuildToolCandidatePaths(
+                "ssh-keyscan.exe",
+                @"C:\Program Files",
+                @"C:\Program Files (x86)",
+                @"C:\Windows",
+                @"C:\Windows\System32\OpenSSH").ToArray();
+            AssertContains(String.Join("|", candidates), @"C:\Windows\Sysnative\OpenSSH\ssh-keyscan.exe", "32-bit app must find native OpenSSH through Sysnative");
+            AssertContains(String.Join("|", candidates), @"C:\Windows\System32\OpenSSH\ssh-keyscan.exe", "64-bit app must find native OpenSSH through System32");
+
+            string puttyPrompt =
+                "The host key is not cached for this server:\n" +
+                "  MiSTer (port 22)\n" +
+                "The server's ssh-ed25519 key fingerprint is:\n" +
+                "  ssh-ed25519 255 SHA256:FqNJOsj3FLUoMQxgn+cqGoXvVfENmVK4QFoSCMKl2lU\n" +
+                "Connection abandoned.\n" +
+                "FATAL ERROR: Cannot confirm a host key in batch mode\n";
+            if (!GroovyTargetDeployer.TryParseMissingHostKeyId(puttyPrompt, out string parsedHostKey) ||
+                parsedHostKey != "SHA256:FqNJOsj3FLUoMQxgn+cqGoXvVfENmVK4QFoSCMKl2lU")
+                return Fail("PuTTY missing-host-key prompt should provide a retryable host key");
 
             return 0;
         }

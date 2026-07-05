@@ -35,6 +35,14 @@ namespace MiSTerCast
 
             Log(log, "Checking target for existing Groovy files...");
             CommandResult inventoryResult = await RunPlinkAsync(plinkPath, config, GroovyTargetConfigurator.BuildInventoryCommand(), hostKeyIds);
+            if (inventoryResult.ExitCode != 0 &&
+                hostKeyIds.Length == 0 &&
+                TryParseMissingHostKeyId(CombineProcessOutput(inventoryResult), out string promptedHostKeyId))
+            {
+                hostKeyIds = new[] { promptedHostKeyId };
+                Log(log, "Read SSH host key fingerprint from PuTTY prompt; retrying target check.");
+                inventoryResult = await RunPlinkAsync(plinkPath, config, GroovyTargetConfigurator.BuildInventoryCommand(), hostKeyIds);
+            }
             EnsureSuccess("Target check failed", inventoryResult);
             GroovyTargetInventory inventory = GroovyTargetConfigurator.ParseInventoryOutput(inventoryResult.StandardOutput);
             Log(log, inventory.HasMisterBinary
@@ -150,10 +158,15 @@ namespace MiSTerCast
             if (result.ExitCode == 0)
                 return;
 
-            string detail = (result.StandardError + Environment.NewLine + result.StandardOutput).Trim();
+            string detail = CombineProcessOutput(result);
             if (String.IsNullOrWhiteSpace(detail))
                 detail = "exit code " + result.ExitCode;
             throw new InvalidOperationException(label + ": " + detail);
+        }
+
+        private static string CombineProcessOutput(CommandResult result)
+        {
+            return (result.StandardError + Environment.NewLine + result.StandardOutput).Trim();
         }
 
         private static void Log(Action<string, bool> log, string message)
@@ -214,6 +227,32 @@ namespace MiSTerCast
             }
         }
 
+        public static bool TryParseMissingHostKeyId(string processOutput, out string hostKeyId)
+        {
+            hostKeyId = "";
+            if (String.IsNullOrWhiteSpace(processOutput) ||
+                processOutput.IndexOf("The host key is not cached", StringComparison.OrdinalIgnoreCase) < 0 ||
+                processOutput.IndexOf("Cannot confirm a host key in batch mode", StringComparison.OrdinalIgnoreCase) < 0)
+                return false;
+
+            foreach (string rawLine in processOutput.Replace("\r\n", "\n").Split('\n'))
+            {
+                string line = rawLine.Trim();
+                int index = line.IndexOf("SHA256:", StringComparison.Ordinal);
+                if (index < 0)
+                    continue;
+
+                string fingerprint = line.Substring(index).Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+                if (!String.IsNullOrWhiteSpace(fingerprint))
+                {
+                    hostKeyId = fingerprint;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static string BuildHostKeyArguments(IEnumerable<string> hostKeyIds)
         {
             if (hostKeyIds == null)
@@ -231,29 +270,44 @@ namespace MiSTerCast
 
         private static string FindTool(string toolName)
         {
-            string[] commonPaths =
-            {
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "PuTTY", toolName),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "PuTTY", toolName)
-            };
-
-            foreach (string path in commonPaths)
+            foreach (string path in BuildToolCandidatePaths(
+                toolName,
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+                Environment.GetEnvironmentVariable("PATH") ?? ""))
             {
                 if (File.Exists(path))
                     return path;
             }
 
-            string pathVariable = Environment.GetEnvironmentVariable("PATH") ?? "";
+            return "";
+        }
+
+        public static IEnumerable<string> BuildToolCandidatePaths(
+            string toolName,
+            string programFiles,
+            string programFilesX86,
+            string windowsDirectory,
+            string pathVariable)
+        {
+            if (!String.IsNullOrWhiteSpace(programFiles))
+                yield return Path.Combine(programFiles, "PuTTY", toolName);
+            if (!String.IsNullOrWhiteSpace(programFilesX86))
+                yield return Path.Combine(programFilesX86, "PuTTY", toolName);
+            if (!String.IsNullOrWhiteSpace(windowsDirectory))
+            {
+                yield return Path.Combine(windowsDirectory, "Sysnative", "OpenSSH", toolName);
+                yield return Path.Combine(windowsDirectory, "System32", "OpenSSH", toolName);
+                yield return Path.Combine(windowsDirectory, "SysWOW64", "OpenSSH", toolName);
+            }
+
             foreach (string directory in pathVariable.Split(Path.PathSeparator))
             {
                 if (String.IsNullOrWhiteSpace(directory))
                     continue;
-                string candidate = Path.Combine(directory.Trim(), toolName);
-                if (File.Exists(candidate))
-                    return candidate;
+                yield return Path.Combine(directory.Trim(), toolName);
             }
-
-            return "";
         }
 
         private static string QuoteArgument(string value)

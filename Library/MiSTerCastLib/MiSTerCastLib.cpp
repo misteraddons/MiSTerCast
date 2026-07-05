@@ -18,6 +18,7 @@ std::atomic_bool stopStream = false;
 std::string targetIpString;
 std::atomic_uint statsFramesSubmitted = 0;
 std::atomic_uint statsFpgaFrame = 0;
+std::atomic_uint statsDroppedFrames = 0;
 std::atomic_uint statsFpgaVCount = 0;
 std::atomic_uint statsFpgaAudio = 0;
 std::atomic_uint statsFpgaSynced = 0;
@@ -186,6 +187,7 @@ MISTERCASTLIB_API bool StartStream(const char* targetIp)
     targetIpString = std::string(targetIp);
     statsFramesSubmitted = 0;
     statsFpgaFrame = 0;
+    statsDroppedFrames = 0;
     statsFpgaVCount = 0;
     statsFpgaAudio = 0;
     statsFpgaSynced = 0;
@@ -214,6 +216,7 @@ MISTERCASTLIB_API bool GetStreamStats(StreamStats* stats)
     stats->streaming = casting_screen ? 1 : 0;
     stats->framesSubmitted = statsFramesSubmitted.load();
     stats->fpgaFrame = statsFpgaFrame.load();
+    stats->droppedFrames = statsDroppedFrames.load();
     stats->fpgaVCount = statsFpgaVCount.load();
     stats->fpgaAudio = statsFpgaAudio.load();
     stats->fpgaSynced = statsFpgaSynced.load();

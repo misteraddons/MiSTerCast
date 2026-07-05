@@ -36,6 +36,7 @@ namespace MiSTerCast
             public UInt32 streaming;
             public UInt32 framesSubmitted;
             public UInt32 fpgaFrame;
+            public UInt32 droppedFrames;
             public UInt32 fpgaVCount;
             public UInt32 fpgaAudio;
             public UInt32 fpgaSynced;

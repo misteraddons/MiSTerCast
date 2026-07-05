@@ -25,13 +25,13 @@ namespace MiSTerCast
                 streaming = 1,
                 framesSubmitted = 1340,
                 fpgaFrame = 1339,
-                fpgaVCount = 211,
+                droppedFrames = 2,
                 fpgaAudio = 0,
                 fpgaSynced = 1
             };
 
             string actual = StreamStatusFormatter.Format(stats, true);
-            string expected = "Status: Streaming | PC frame 1340 | MiSTer synced, 1 frame behind | PC audio requested, MiSTer off | raster line 211";
+            string expected = "Status: Streaming | PC frame 1340 | MiSTer synced, 1 frame behind | dropped 2 | PC audio requested, MiSTer off";
             if (actual != expected)
             {
                 Console.Error.WriteLine("Expected: " + expected);
@@ -41,12 +41,12 @@ namespace MiSTerCast
 
             stats.framesSubmitted = 1340;
             stats.fpgaFrame = 1340;
-            stats.fpgaVCount = 0;
+            stats.droppedFrames = 0;
             stats.fpgaAudio = 1;
             stats.fpgaSynced = 0;
 
             actual = StreamStatusFormatter.Format(stats, false);
-            expected = "Status: Streaming | PC frame 1340 | MiSTer sync pending, caught up | PC audio disabled, MiSTer on | raster line 0";
+            expected = "Status: Streaming | PC frame 1340 | MiSTer sync pending, caught up | dropped 0 | PC audio disabled, MiSTer on";
             if (actual != expected)
             {
                 Console.Error.WriteLine("Expected: " + expected);

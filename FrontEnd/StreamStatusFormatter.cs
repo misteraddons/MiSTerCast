@@ -9,12 +9,12 @@ namespace MiSTerCast
             string audio = DescribeAudioState(audioRequested, stats.fpgaAudio != 0);
             string sync = stats.fpgaSynced != 0 ? "MiSTer synced" : "MiSTer sync pending";
             return String.Format(
-                "Status: Streaming | PC frame {0} | {1}, {2} | {3} | raster line {4}",
+                "Status: Streaming | PC frame {0} | {1}, {2} | dropped {3} | {4}",
                 stats.framesSubmitted,
                 sync,
                 DescribeFrameLag(stats.framesSubmitted, stats.fpgaFrame),
-                audio,
-                stats.fpgaVCount);
+                stats.droppedFrames,
+                audio);
         }
 
         private static string DescribeAudioState(bool audioRequested, bool fpgaAudio)

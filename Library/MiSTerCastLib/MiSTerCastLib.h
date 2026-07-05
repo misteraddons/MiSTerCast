@@ -72,6 +72,7 @@ struct StreamStats {
     UINT32 streaming;
     UINT32 framesSubmitted;
     UINT32 fpgaFrame;
+    UINT32 droppedFrames;
     UINT32 fpgaVCount;
     UINT32 fpgaAudio;
     UINT32 fpgaSynced;

@@ -85,6 +85,8 @@ private:
     int m_compression = 0;
     int m_frame = 0;
     int m_field = 0;
+    uint32_t m_last_fpga_frame = 0;
+    bool m_have_last_fpga_frame = false;
     unsigned int m_width = 0;
     unsigned int m_height = 0;
     int m_vtotal = 0;
@@ -325,8 +327,18 @@ bool renderer_nogpu::draw()
     // Blit now
     groovyMister.CmdBlit(m_frame, m_field, 0/*m_vsync_scanline*/, 15000, 0);
     groovyMister.WaitSync();
+    uint32_t currentFpgaFrame = groovyMister.fpga.frame;
+    if (m_have_last_fpga_frame && currentFpgaFrame > m_last_fpga_frame)
+    {
+        uint32_t frameGap = currentFpgaFrame - m_last_fpga_frame;
+        if (frameGap > 1)
+            statsDroppedFrames.fetch_add(frameGap - 1);
+    }
+    m_last_fpga_frame = currentFpgaFrame;
+    m_have_last_fpga_frame = true;
+
     statsFramesSubmitted = static_cast<unsigned int>(m_frame);
-    statsFpgaFrame = groovyMister.fpga.frame;
+    statsFpgaFrame = currentFpgaFrame;
     statsFpgaVCount = groovyMister.fpga.vCount;
     statsFpgaAudio = groovyMister.fpga.audio;
     statsFpgaSynced = groovyMister.fpga.vramSynced;

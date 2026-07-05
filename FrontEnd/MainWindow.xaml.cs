@@ -873,7 +873,15 @@ namespace MiSTerCast
         private void CaptureSource_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (isInitialized)
+            {
+                if (sender == CropComboBox)
+                {
+                    currentSourceOptions.cropmode = (byte)CropComboBox.SelectedIndex;
+                    UpdateCropSize();
+                }
+
                 OnCaptureSourceChanged();
+            }
         }
 
         private void CaptureSource_Checked(object sender, RoutedEventArgs e)
@@ -921,6 +929,40 @@ namespace MiSTerCast
             }
             CaptureWidth.TextChanged += CaptureSource_TextChanged;
             CaptureHeight.TextChanged += CaptureSource_TextChanged;
+        }
+
+        private void CaptureQuickButton_Click(object sender, RoutedEventArgs e)
+        {
+            Button button = sender as Button;
+            if (button == null || button.Tag == null)
+                return;
+
+            CaptureQuickAction action;
+            if (!Enum.TryParse(button.Tag.ToString(), out action))
+                return;
+
+            int cropIndex = CaptureQuickActions.GetCropModeIndex(action);
+            if (cropIndex >= 0 && cropIndex < CropComboBox.Items.Count)
+            {
+                if (CropComboBox.SelectedIndex == cropIndex)
+                {
+                    currentSourceOptions.cropmode = (byte)cropIndex;
+                    UpdateCropSize();
+                    OnCaptureSourceChanged();
+                }
+                else
+                {
+                    CropComboBox.SelectedIndex = cropIndex;
+                }
+            }
+        }
+
+        private void ResetCaptureOffsetButton_Click(object sender, RoutedEventArgs e)
+        {
+            CaptureXOffset.Text = "0";
+            CaptureYOffset.Text = "0";
+            if (isInitialized)
+                OnCaptureSourceChanged();
         }
 
         #endregion Capture Source
@@ -976,6 +1018,53 @@ namespace MiSTerCast
         {
             if (OnModelineChanged())
                 ApplyModelineButton.IsEnabled = false;
+        }
+
+        private void AutofillModelineButton_Click(object sender, RoutedEventArgs e)
+        {
+            ushort hactive;
+            ushort vactive;
+            if (!ushort.TryParse(hactiveTextBox.Text, out hactive) || !ushort.TryParse(vactiveTextBox.Text, out vactive))
+            {
+                Log("Auto fill failed: active width and height must be valid positive integers.", true);
+                return;
+            }
+
+            Modeline template = GetAutofillTemplate(interlacedCheckBox.IsChecked.Value, vactive);
+            Modeline modeline;
+            string error;
+            if (!ModelineAutofill.TryBuild(template, hactive, vactive, interlacedCheckBox.IsChecked.Value, out modeline, out error))
+            {
+                Log("Auto fill failed: " + error, true);
+                return;
+            }
+
+            SetModelineUI(modeline);
+            ModelinePresetsBox.SelectedIndex = 0;
+            if (OnModelineChanged())
+                ApplyModelineButton.IsEnabled = false;
+        }
+
+        private Modeline GetAutofillTemplate(bool interlace, ushort vactive)
+        {
+            if (ModelinePresetsBox.SelectedIndex > 0 && modelines != null && ModelinePresetsBox.SelectedIndex <= modelines.Count)
+                return modelines[ModelinePresetsBox.SelectedIndex - 1];
+
+            Modeline fallback = modelines[0];
+            int bestScore = int.MaxValue;
+            foreach (Modeline modeline in modelines)
+            {
+                int score = Math.Abs(modeline.vactive - vactive);
+                if (modeline.interlace != interlace)
+                    score += 10000;
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    fallback = modeline;
+                }
+            }
+
+            return fallback;
         }
 
         private void SetModelineUI(Modeline modeline)

@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:MiSTerCast"
         mc:Ignorable="d"
-        Title="MiSTerCast 1.02" Height="600" Width="680"
+        Title="MiSTerCast 1.02" Height="600" Width="800"
         Activated="Window_Activated"
         Closing="MainWindow_Closing"
         Closed="Window_Closed">
@@ -32,6 +32,7 @@
                         <ColumnDefinition Width="auto"/>
                         <ColumnDefinition Width="120"/>
                         <ColumnDefinition Width="95"/>
+                        <ColumnDefinition Width="125"/>
                         <ColumnDefinition Width="44"/>
                     </Grid.ColumnDefinitions>
                     <Button x:Name="ToggleStreamButton" Grid.Column="0" Margin="10 10 10 10" IsEnabled="True" Height="Auto" Click="ToggleStreamButton_Click">Start Stream</Button>
@@ -40,7 +41,8 @@
                     <Label Grid.Column="3" Margin="10 10 10 10">Target</Label>
                     <TextBox x:Name="TargetIpAddresTextBox" Grid.Column="4" Margin="10 10 10 10" TextAlignment="Left">MiSTer</TextBox>
                     <Button x:Name="TestTargetButton" Grid.Column="5" Margin="10 10 10 10" Click="TestTargetButton_Click">Test Target</Button>
-                    <Button x:Name="HelpButton" Grid.Column="6"  Margin="10 10 10 10" Click="HelpButton_Click">
+                    <Button x:Name="ConfigureTargetButton" Grid.Column="6" Margin="10 10 10 10" Click="ConfigureTargetButton_Click">Configure Target</Button>
+                    <Button x:Name="HelpButton" Grid.Column="7"  Margin="10 10 10 10" Click="HelpButton_Click">
                         <Button.Resources>
                             <Style TargetType="Border">
                                 <Setter Property="CornerRadius" Value="10"/>
@@ -48,7 +50,7 @@
                         </Button.Resources> 
                         ?
                     </Button>
-                    <TextBlock x:Name="StreamStatusTextBlock" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="7" Margin="10 0 10 8" Text="Status: Not initialized" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock x:Name="StreamStatusTextBlock" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="8" Margin="10 0 10 8" Text="Status: Not initialized" TextTrimming="CharacterEllipsis"/>
                 </Grid>
             </GroupBox>
             <Grid Grid.Row="2">

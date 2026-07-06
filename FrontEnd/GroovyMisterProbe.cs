@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -20,6 +21,9 @@ namespace MiSTerCast
     static class GroovyMisterProbe
     {
         public const int DefaultPort = 32100;
+        public const int DefaultPostLaunchProbeTimeoutMilliseconds = 15000;
+        public const int DefaultPostLaunchAttemptTimeoutMilliseconds = 1000;
+        public const int DefaultPostLaunchRetryDelayMilliseconds = 1000;
 
         public static async Task<GroovyMisterProbeResult> ProbeAsync(string target, int timeoutMilliseconds = 1000)
         {
@@ -80,6 +84,43 @@ namespace MiSTerCast
             }
         }
 
+        public static async Task<GroovyMisterProbeResult> ProbeUntilAsync(
+            string target,
+            int totalTimeoutMilliseconds = DefaultPostLaunchProbeTimeoutMilliseconds,
+            int attemptTimeoutMilliseconds = DefaultPostLaunchAttemptTimeoutMilliseconds,
+            int retryDelayMilliseconds = DefaultPostLaunchRetryDelayMilliseconds,
+            Action<string, bool> log = null,
+            Func<string, int, Task<GroovyMisterProbeResult>> probeAsync = null,
+            Func<int, Task> delayAsync = null)
+        {
+            if (probeAsync == null)
+                probeAsync = ProbeAsync;
+            if (delayAsync == null)
+                delayAsync = milliseconds => Task.Delay(milliseconds);
+
+            var stopwatch = Stopwatch.StartNew();
+            GroovyMisterProbeResult lastResult = null;
+
+            while (true)
+            {
+                lastResult = await probeAsync(target, attemptTimeoutMilliseconds);
+                if (lastResult.Success)
+                    return lastResult;
+
+                int elapsedMilliseconds = (int)stopwatch.ElapsedMilliseconds;
+                if (elapsedMilliseconds >= totalTimeoutMilliseconds)
+                    return lastResult;
+
+                Log(log, "Groovy_MiSTer not ready yet (" + lastResult.Message + "); retrying UDP probe...");
+                int remainingMilliseconds = totalTimeoutMilliseconds - elapsedMilliseconds;
+                int delayMilliseconds = Math.Min(Math.Max(retryDelayMilliseconds, 0), remainingMilliseconds);
+                if (delayMilliseconds > 0)
+                    await delayAsync(delayMilliseconds);
+                else
+                    await Task.Yield();
+            }
+        }
+
         private static GroovyMisterProbeResult Failure(string address, int port, string message)
         {
             return new GroovyMisterProbeResult
@@ -89,6 +130,12 @@ namespace MiSTerCast
                 Port = port,
                 Message = message
             };
+        }
+
+        private static void Log(Action<string, bool> log, string message)
+        {
+            if (log != null)
+                log(message, false);
         }
 
         private static IPAddress ResolveIPv4(string target)

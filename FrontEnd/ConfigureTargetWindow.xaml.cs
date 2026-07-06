@@ -1,0 +1,148 @@
+using System;
+using System.Collections.Generic;
+using System.Windows;
+using Microsoft.Win32;
+
+namespace MiSTerCast
+{
+    public partial class ConfigureTargetWindow : Window
+    {
+        internal GroovyTargetDeploymentConfig DeploymentConfig { get; private set; }
+        private GroovyReleaseInfo downloadedRelease;
+
+        public ConfigureTargetWindow(GroovyTargetDeploymentConfig config)
+        {
+            InitializeComponent();
+            if (config == null)
+                config = new GroovyTargetDeploymentConfig();
+
+            TargetComboBox.Text = config.Target ?? "";
+            UsernameTextBox.Text = String.IsNullOrWhiteSpace(config.Username) ? GroovyTargetConfigurator.DefaultUsername : config.Username;
+            PasswordBox.Password = config.Password ?? GroovyTargetConfigurator.DefaultPassword;
+            MisterBinaryPathTextBox.Text = config.MisterBinaryPath ?? "";
+            GroovyRbfPathTextBox.Text = config.GroovyRbfPath ?? "";
+            ForceRedeployCheckBox.IsChecked = config.ForceRedeploy;
+        }
+
+        private void BrowseMisterBinaryButton_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new OpenFileDialog();
+            dialog.Title = "Select MiSTer_groovy";
+            dialog.Filter = "MiSTer_groovy|MiSTer_groovy|All Files|*.*";
+            if (dialog.ShowDialog(this) == true)
+                MisterBinaryPathTextBox.Text = dialog.FileName;
+        }
+
+        private void BrowseGroovyRbfButton_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new OpenFileDialog();
+            dialog.Title = "Select Groovy RBF";
+            dialog.Filter = "RBF Files|*.rbf|All Files|*.*";
+            if (dialog.ShowDialog(this) == true)
+                GroovyRbfPathTextBox.Text = dialog.FileName;
+        }
+
+        private async void DownloadLatestButton_Click(object sender, RoutedEventArgs e)
+        {
+            DownloadLatestButton.IsEnabled = false;
+            ReleaseStatusTextBlock.Text = "Checking GitHub...";
+
+            try
+            {
+                var downloader = new GroovyReleaseDownloader();
+                GroovyReleaseInfo release = await downloader.DownloadLatestAsync((message, error) =>
+                {
+                    ReleaseStatusTextBlock.Text = message;
+                });
+
+                MisterBinaryPathTextBox.Text = release.MisterBinaryPath;
+                GroovyRbfPathTextBox.Text = release.GroovyRbfPath;
+                downloadedRelease = release;
+                ReleaseStatusTextBlock.Text = "Ready: " + release.DisplayName;
+            }
+            catch (Exception exception)
+            {
+                ReleaseStatusTextBlock.Text = "Download failed";
+                MessageBox.Show(this, exception.Message, "Download Latest", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            finally
+            {
+                DownloadLatestButton.IsEnabled = true;
+            }
+        }
+
+        private async void ScanTargetsButton_Click(object sender, RoutedEventArgs e)
+        {
+            string currentTarget = TargetComboBox.Text;
+            ScanTargetsButton.IsEnabled = false;
+            ReleaseStatusTextBlock.Text = "Scanning network...";
+
+            try
+            {
+                List<NetworkTargetCandidate> candidates = await NetworkTargetScanner.ScanAsync((message, error) =>
+                {
+                    ReleaseStatusTextBlock.Text = message;
+                });
+
+                TargetComboBox.Items.Clear();
+                foreach (NetworkTargetCandidate candidate in candidates)
+                    TargetComboBox.Items.Add(candidate.DisplayText);
+
+                if (!String.IsNullOrWhiteSpace(currentTarget))
+                    TargetComboBox.Text = currentTarget;
+
+                ReleaseStatusTextBlock.Text = candidates.Count == 0
+                    ? "No SSH targets found."
+                    : "Found " + candidates.Count + " target" + (candidates.Count == 1 ? "." : "s.");
+                if (candidates.Count > 0)
+                    TargetComboBox.IsDropDownOpen = true;
+            }
+            catch (Exception exception)
+            {
+                ReleaseStatusTextBlock.Text = "Scan failed";
+                MessageBox.Show(this, exception.Message, "Scan Targets", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            finally
+            {
+                ScanTargetsButton.IsEnabled = true;
+            }
+        }
+
+        private void DeployButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (String.IsNullOrWhiteSpace(TargetComboBox.Text))
+            {
+                MessageBox.Show(this, "Target is required.", "Configure Target", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (String.IsNullOrWhiteSpace(UsernameTextBox.Text))
+            {
+                MessageBox.Show(this, "Username is required.", "Configure Target", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            DeploymentConfig = new GroovyTargetDeploymentConfig
+            {
+                Target = NetworkTargetScanner.ExtractTargetValue(TargetComboBox.Text),
+                Username = UsernameTextBox.Text.Trim(),
+                Password = PasswordBox.Password,
+                MisterBinaryPath = MisterBinaryPathTextBox.Text.Trim(),
+                GroovyRbfPath = GroovyRbfPathTextBox.Text.Trim(),
+                ForceRedeploy = ForceRedeployCheckBox.IsChecked == true,
+                ReleaseManifest = CreateReleaseManifest()
+            };
+            DialogResult = true;
+        }
+
+        private GroovyTargetManifest CreateReleaseManifest()
+        {
+            if (downloadedRelease != null &&
+                String.Equals(MisterBinaryPathTextBox.Text.Trim(), downloadedRelease.MisterBinaryPath, StringComparison.OrdinalIgnoreCase) &&
+                String.Equals(GroovyRbfPathTextBox.Text.Trim(), downloadedRelease.GroovyRbfPath, StringComparison.OrdinalIgnoreCase))
+                return GroovyTargetManifest.FromRelease(downloadedRelease);
+
+            return GroovyTargetManifest.FromLocalFiles(MisterBinaryPathTextBox.Text.Trim(), GroovyRbfPathTextBox.Text.Trim());
+        }
+    }
+}

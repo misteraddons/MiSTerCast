@@ -1,0 +1,59 @@
+<Window x:Class="MiSTerCast.ConfigureTargetWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Configure Target" Height="380" Width="640"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+    <Border Padding="12">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="115"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="95"/>
+            </Grid.ColumnDefinitions>
+
+            <Label Grid.Row="0" Grid.Column="0" Margin="0 4 8 4">Target</Label>
+            <ComboBox x:Name="TargetComboBox" Grid.Row="0" Grid.Column="1" Margin="0 4 8 4" IsEditable="True" IsTextSearchEnabled="False"/>
+            <Button x:Name="ScanTargetsButton" Grid.Row="0" Grid.Column="2" Margin="0 4 0 4" Click="ScanTargetsButton_Click">Scan</Button>
+
+            <Label Grid.Row="1" Grid.Column="0" Margin="0 4 8 4">Username</Label>
+            <TextBox x:Name="UsernameTextBox" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0 4 0 4"/>
+
+            <Label Grid.Row="2" Grid.Column="0" Margin="0 4 8 4">Password</Label>
+            <PasswordBox x:Name="PasswordBox" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0 4 0 4"/>
+
+            <Label Grid.Row="3" Grid.Column="0" Margin="0 4 8 4">MiSTer_groovy</Label>
+            <TextBox x:Name="MisterBinaryPathTextBox" Grid.Row="3" Grid.Column="1" Margin="0 4 8 4"/>
+            <Button Grid.Row="3" Grid.Column="2" Margin="0 4 0 4" Click="BrowseMisterBinaryButton_Click">Browse</Button>
+
+            <Label Grid.Row="4" Grid.Column="0" Margin="0 4 8 4">Groovy RBF</Label>
+            <TextBox x:Name="GroovyRbfPathTextBox" Grid.Row="4" Grid.Column="1" Margin="0 4 8 4"/>
+            <Button Grid.Row="4" Grid.Column="2" Margin="0 4 0 4" Click="BrowseGroovyRbfButton_Click">Browse</Button>
+
+            <StackPanel Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0 6 0 2">
+                <Button x:Name="DownloadLatestButton" Width="120" Margin="0 0 8 0" Click="DownloadLatestButton_Click">Download Latest</Button>
+                <TextBlock x:Name="ReleaseStatusTextBlock" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+
+            <CheckBox x:Name="ForceRedeployCheckBox" Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="2" Margin="0 8 0 8">
+                Redeploy even if files already exist
+            </CheckBox>
+
+            <StackPanel Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Width="80" Margin="0 8 8 0" IsCancel="True">Cancel</Button>
+                <Button Width="120" Margin="0 8 0 0" IsDefault="True" Click="DeployButton_Click">Deploy</Button>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

@@ -17,21 +17,6 @@ using System.Windows.Threading;
 
 namespace MiSTerCast
 {
-    struct Modeline
-    {
-        public string name;
-        public Double pclock;
-        public UInt16 hactive;
-        public UInt16 hbegin;
-        public UInt16 hend;
-        public UInt16 htotal;
-        public UInt16 vactive;
-        public UInt16 vbegin;
-        public UInt16 vend;
-        public UInt16 vtotal;
-        public bool interlace;
-    }
-
     struct SourceOptions
     {
         public byte display;
@@ -612,8 +597,6 @@ namespace MiSTerCast
 
         #region Settings
 
-        const int SettingsVersion = 1;
-
         private void SaveSettingsButton_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -635,30 +618,31 @@ namespace MiSTerCast
                         {
                             using (var sw = new StreamWriter(fs))
                             {
-                                sw.WriteLine(SettingsVersion);
-
-                                sw.WriteLine(TargetIpAddresTextBox.Text);
-
-                                sw.WriteLine(ModelinePresetsBox.SelectedIndex);
-                                sw.WriteLine(pclockTextBox.Text);
-                                sw.WriteLine(hactiveTextBox.Text);
-                                sw.WriteLine(hbeginTextBox.Text);
-                                sw.WriteLine(hendTextBox.Text);
-                                sw.WriteLine(htotalTextBox.Text);
-                                sw.WriteLine(vactiveTextBox.Text);
-                                sw.WriteLine(vbeginTextBox.Text);
-                                sw.WriteLine(vendTextBox.Text);
-                                sw.WriteLine(vtotalTextBox.Text);
-                                sw.WriteLine(interlacedCheckBox.IsChecked.Value ? 1 : 0);
-
-                                sw.WriteLine(CaptureSourceBox.SelectedIndex);
-                                sw.WriteLine(RotateComboBox.SelectedIndex);
-                                sw.WriteLine(EnableAudioCheckBox.IsChecked.Value ? 1 : 0);
-                                sw.WriteLine(CropComboBox.SelectedIndex);
-                                sw.WriteLine(CaptureWidth.Text);
-                                sw.WriteLine(CaptureHeight.Text);
-                                sw.WriteLine(CaptureXOffset.Text);
-                                sw.WriteLine(CaptureYOffset.Text);
+                                new MiSTerCastSettings
+                                {
+                                    Target = TargetIpAddresTextBox.Text,
+                                    ModelinePresetIndex = ModelinePresetsBox.SelectedIndex,
+                                    PclockText = pclockTextBox.Text,
+                                    HactiveText = hactiveTextBox.Text,
+                                    HbeginText = hbeginTextBox.Text,
+                                    HendText = hendTextBox.Text,
+                                    HtotalText = htotalTextBox.Text,
+                                    VactiveText = vactiveTextBox.Text,
+                                    VbeginText = vbeginTextBox.Text,
+                                    VendText = vendTextBox.Text,
+                                    VtotalText = vtotalTextBox.Text,
+                                    Interlaced = interlacedCheckBox.IsChecked.Value,
+                                    CaptureSourceIndex = CaptureSourceBox.SelectedIndex,
+                                    AlignmentIndex = AlignmentBox.SelectedIndex,
+                                    RotationIndex = RotateComboBox.SelectedIndex,
+                                    AudioEnabled = EnableAudioCheckBox.IsChecked.Value,
+                                    PreviewEnabled = EnablePreviewCheckBox.IsChecked.Value,
+                                    CropIndex = CropComboBox.SelectedIndex,
+                                    CaptureWidthText = CaptureWidth.Text,
+                                    CaptureHeightText = CaptureHeight.Text,
+                                    CaptureXOffsetText = CaptureXOffset.Text,
+                                    CaptureYOffsetText = CaptureYOffset.Text
+                                }.Save(sw);
 
                                 Log("Settings saved.");
                             }
@@ -712,48 +696,36 @@ namespace MiSTerCast
         {
             try
             {
-                int settingsVersion;
-                if (!int.TryParse(sr.ReadLine(), out settingsVersion))
+                MiSTerCastSettings settings;
+                string error;
+                if (!MiSTerCastSettings.TryLoad(sr, out settings, out error))
                 {
-                    Log("Invalid settings file format.", true);
-                    return;
-                }
-                if (settingsVersion > SettingsVersion)
-                {
-                    Log("Unsupported save file version: " + settingsVersion, true);
+                    Log(error, true);
                     return;
                 }
 
-                TargetIpAddresTextBox.Text = sr.ReadLine() ?? "";
-
-                int modelineIndex;
-                if (int.TryParse(sr.ReadLine(), out modelineIndex))
-                    ModelinePresetsBox.SelectedIndex = Math.Min(modelineIndex, ModelinePresetsBox.Items.Count - 1);
-
-                pclockTextBox.Text = sr.ReadLine() ?? "";
-                hactiveTextBox.Text = sr.ReadLine() ?? "";
-                hbeginTextBox.Text = sr.ReadLine() ?? "";
-                hendTextBox.Text = sr.ReadLine() ?? "";
-                htotalTextBox.Text = sr.ReadLine() ?? "";
-                vactiveTextBox.Text = sr.ReadLine() ?? "";
-                vbeginTextBox.Text = sr.ReadLine() ?? "";
-                vendTextBox.Text = sr.ReadLine() ?? "";
-                vtotalTextBox.Text = sr.ReadLine() ?? "";
-                interlacedCheckBox.IsChecked = sr.ReadLine() == "1";
-
-                int captureIndex, rotateIndex, cropIndex;
-                if (int.TryParse(sr.ReadLine(), out captureIndex))
-                    CaptureSourceBox.SelectedIndex = Math.Min(captureIndex, CaptureSourceBox.Items.Count - 1);
-                if (int.TryParse(sr.ReadLine(), out rotateIndex))
-                    RotateComboBox.SelectedIndex = Math.Min(rotateIndex, RotateComboBox.Items.Count - 1);
-                EnableAudioCheckBox.IsChecked = sr.ReadLine() == "1";
-                if (int.TryParse(sr.ReadLine(), out cropIndex))
-                    CropComboBox.SelectedIndex = Math.Min(cropIndex, CropComboBox.Items.Count - 1);
-
-                CaptureWidth.Text = sr.ReadLine() ?? "";
-                CaptureHeight.Text = sr.ReadLine() ?? "";
-                CaptureXOffset.Text = sr.ReadLine() ?? "";
-                CaptureYOffset.Text = sr.ReadLine() ?? "";
+                TargetIpAddresTextBox.Text = settings.Target;
+                ModelinePresetsBox.SelectedIndex = ClampIndex(settings.ModelinePresetIndex, ModelinePresetsBox.Items.Count);
+                pclockTextBox.Text = settings.PclockText;
+                hactiveTextBox.Text = settings.HactiveText;
+                hbeginTextBox.Text = settings.HbeginText;
+                hendTextBox.Text = settings.HendText;
+                htotalTextBox.Text = settings.HtotalText;
+                vactiveTextBox.Text = settings.VactiveText;
+                vbeginTextBox.Text = settings.VbeginText;
+                vendTextBox.Text = settings.VendText;
+                vtotalTextBox.Text = settings.VtotalText;
+                interlacedCheckBox.IsChecked = settings.Interlaced;
+                CaptureSourceBox.SelectedIndex = ClampIndex(settings.CaptureSourceIndex, CaptureSourceBox.Items.Count);
+                AlignmentBox.SelectedIndex = ClampIndex(settings.AlignmentIndex, AlignmentBox.Items.Count);
+                RotateComboBox.SelectedIndex = ClampIndex(settings.RotationIndex, RotateComboBox.Items.Count);
+                EnableAudioCheckBox.IsChecked = settings.AudioEnabled;
+                EnablePreviewCheckBox.IsChecked = settings.PreviewEnabled;
+                CropComboBox.SelectedIndex = ClampIndex(settings.CropIndex, CropComboBox.Items.Count);
+                CaptureWidth.Text = settings.CaptureWidthText;
+                CaptureHeight.Text = settings.CaptureHeightText;
+                CaptureXOffset.Text = settings.CaptureXOffsetText;
+                CaptureYOffset.Text = settings.CaptureYOffsetText;
 
                 Log("Settings loaded.");
             }
@@ -761,6 +733,13 @@ namespace MiSTerCast
             {
                 Log("Error parsing settings file: " + e.Message, true);
             }
+        }
+
+        private static int ClampIndex(int index, int itemCount)
+        {
+            if (itemCount <= 0)
+                return -1;
+            return Math.Max(0, Math.Min(index, itemCount - 1));
         }
 
         private void UpdateLastSaveFile(string fileName)
@@ -894,7 +873,15 @@ namespace MiSTerCast
         private void CaptureSource_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (isInitialized)
+            {
+                if (sender == CropComboBox)
+                {
+                    currentSourceOptions.cropmode = (byte)CropComboBox.SelectedIndex;
+                    UpdateCropSize();
+                }
+
                 OnCaptureSourceChanged();
+            }
         }
 
         private void CaptureSource_Checked(object sender, RoutedEventArgs e)
@@ -944,6 +931,40 @@ namespace MiSTerCast
             CaptureHeight.TextChanged += CaptureSource_TextChanged;
         }
 
+        private void CaptureQuickButton_Click(object sender, RoutedEventArgs e)
+        {
+            Button button = sender as Button;
+            if (button == null || button.Tag == null)
+                return;
+
+            CaptureQuickAction action;
+            if (!Enum.TryParse(button.Tag.ToString(), out action))
+                return;
+
+            int cropIndex = CaptureQuickActions.GetCropModeIndex(action);
+            if (cropIndex >= 0 && cropIndex < CropComboBox.Items.Count)
+            {
+                if (CropComboBox.SelectedIndex == cropIndex)
+                {
+                    currentSourceOptions.cropmode = (byte)cropIndex;
+                    UpdateCropSize();
+                    OnCaptureSourceChanged();
+                }
+                else
+                {
+                    CropComboBox.SelectedIndex = cropIndex;
+                }
+            }
+        }
+
+        private void ResetCaptureOffsetButton_Click(object sender, RoutedEventArgs e)
+        {
+            CaptureXOffset.Text = "0";
+            CaptureYOffset.Text = "0";
+            if (isInitialized)
+                OnCaptureSourceChanged();
+        }
+
         #endregion Capture Source
 
         #region Modelines
@@ -951,7 +972,7 @@ namespace MiSTerCast
         private Modeline currentModeLine;
         private List<Modeline> modelines;
 
-        private void OnModelineChanged()
+        private bool OnModelineChanged()
         {
             double.TryParse(pclockTextBox.Text.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out currentModeLine.pclock);
             ushort.TryParse(hactiveTextBox.Text, out currentModeLine.hactive);
@@ -964,7 +985,15 @@ namespace MiSTerCast
             ushort.TryParse(vtotalTextBox.Text, out currentModeLine.vtotal);
             currentModeLine.interlace = interlacedCheckBox.IsChecked.Value;
 
-            if (isInitialized && currentModeLine.pclock > 0 && currentModeLine.hactive > 0 && currentModeLine.vactive > 0)
+            string error;
+            if (!ModelineValidator.TryValidate(currentModeLine, out error))
+            {
+                if (isInitialized)
+                    Log("Invalid modeline: " + error, true);
+                return false;
+            }
+
+            if (isInitialized)
             {
                 MiSTerCastInterop.SetModeline(
                     currentModeLine.pclock,
@@ -981,12 +1010,61 @@ namespace MiSTerCast
                 UpdateCropSize();
                 OnCaptureSourceChanged();
             }
+
+            return true;
         }
 
         private void ApplyModelineButton_Click(object sender, RoutedEventArgs e)
         {
-            OnModelineChanged();
-            ApplyModelineButton.IsEnabled = false;
+            if (OnModelineChanged())
+                ApplyModelineButton.IsEnabled = false;
+        }
+
+        private void AutofillModelineButton_Click(object sender, RoutedEventArgs e)
+        {
+            ushort hactive;
+            ushort vactive;
+            if (!ushort.TryParse(hactiveTextBox.Text, out hactive) || !ushort.TryParse(vactiveTextBox.Text, out vactive))
+            {
+                Log("Auto fill failed: active width and height must be valid positive integers.", true);
+                return;
+            }
+
+            Modeline template = GetAutofillTemplate(interlacedCheckBox.IsChecked.Value, vactive);
+            Modeline modeline;
+            string error;
+            if (!ModelineAutofill.TryBuild(template, hactive, vactive, interlacedCheckBox.IsChecked.Value, out modeline, out error))
+            {
+                Log("Auto fill failed: " + error, true);
+                return;
+            }
+
+            SetModelineUI(modeline);
+            ModelinePresetsBox.SelectedIndex = 0;
+            if (OnModelineChanged())
+                ApplyModelineButton.IsEnabled = false;
+        }
+
+        private Modeline GetAutofillTemplate(bool interlace, ushort vactive)
+        {
+            if (ModelinePresetsBox.SelectedIndex > 0 && modelines != null && ModelinePresetsBox.SelectedIndex <= modelines.Count)
+                return modelines[ModelinePresetsBox.SelectedIndex - 1];
+
+            Modeline fallback = modelines[0];
+            int bestScore = int.MaxValue;
+            foreach (Modeline modeline in modelines)
+            {
+                int score = Math.Abs(modeline.vactive - vactive);
+                if (modeline.interlace != interlace)
+                    score += 10000;
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    fallback = modeline;
+                }
+            }
+
+            return fallback;
         }
 
         private void SetModelineUI(Modeline modeline)
@@ -1081,7 +1159,16 @@ namespace MiSTerCast
                                     else
                                     {
                                         modeline.interlace = interlace != 0;
-                                        newModeLines.Add(modeline);
+                                        string validationError;
+                                        if (!ModelineValidator.TryValidate(modeline, out validationError))
+                                        {
+                                            Log("Invalid modeline values: " + lines[i] + " (" + validationError + ")", true);
+                                            badLine = true;
+                                        }
+                                        else
+                                        {
+                                            newModeLines.Add(modeline);
+                                        }
                                     }
                                 }
                             }

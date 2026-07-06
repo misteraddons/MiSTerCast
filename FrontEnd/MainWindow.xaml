@@ -63,11 +63,13 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="*"/>
+                            <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
                         <ComboBox x:Name="ModelinePresetsBox" Grid.Row="0" Margin="10 10 10 10" Width="Auto" SelectedIndex="0" SelectionChanged="ModelinePresetsBox_SelectionChanged">
                             <ComboBoxItem>320x240 NTSC (60Hz)</ComboBoxItem>
                         </ComboBox>
                         <Button x:Name="ApplyModelineButton" IsEnabled="False" Grid.Row="1" Margin="10 10 10 10" Click="ApplyModelineButton_Click">Apply Modeline</Button>
+                        <Button x:Name="AutofillModelineButton" Grid.Row="2" Margin="10 10 10 10" Click="AutofillModelineButton_Click">Auto Fill</Button>
                     </Grid>
                 </GroupBox>
                 <GroupBox Header="Modeline" Grid.Column="1">
@@ -218,6 +220,7 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         <ComboBox x:Name="CropComboBox" Grid.Row="0" Margin="10 10 10 0" Width="Auto" SelectedIndex="0" SelectionChanged="CaptureSource_SelectionChanged">
                             <ComboBoxItem>Custom Size</ComboBoxItem>
@@ -255,6 +258,15 @@
                                 <TextBox x:Name="CaptureYOffset" Grid.Column="2" Margin="4,4,4,4" PreviewTextInput="IntValidation" TextChanged="CaptureSource_TextChanged">0</TextBox>
                             </Grid>
                         </Grid>
+                        <UniformGrid Grid.Row="2" Columns="3" Margin="10 4 10 0">
+                            <Button Margin="1" Tag="Native" Click="CaptureQuickButton_Click">Native</Button>
+                            <Button Margin="1" Tag="Scale2" Click="CaptureQuickButton_Click">2x</Button>
+                            <Button Margin="1" Tag="Scale3" Click="CaptureQuickButton_Click">3x</Button>
+                            <Button Margin="1" Tag="Scale4" Click="CaptureQuickButton_Click">4x</Button>
+                            <Button Margin="1" Tag="Full43" Click="CaptureQuickButton_Click">4:3</Button>
+                            <Button Margin="1" Tag="Full54" Click="CaptureQuickButton_Click">5:4</Button>
+                            <Button Margin="1" Click="ResetCaptureOffsetButton_Click">Reset</Button>
+                        </UniformGrid>
                     </Grid>
                     <Grid Grid.Column="2" Background="Gray">
                         <Label x:Name="PreviewDisabledLabel" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Hidden">Preview Disabled</Label>

@@ -505,7 +505,7 @@ void GroovyMister::CmdSwitchres(double pClock, uint16_t hActive, uint16_t hBegin
 		m_RGBSize = m_RGBSize >> 1;
 	}
 
-	m_widthTime = 10 * round((double) hTotal * (1 / pClock)); //in nanosec, time to raster 1 line
+	m_widthTime = static_cast<uint32_t>(10 * round((double) hTotal * (1 / pClock))); //in nanosec, time to raster 1 line
 	m_frameTime = (m_widthTime * vTotal) >> interlace_modeline;
 	
 	m_interlace = interlace_modeline;
@@ -545,7 +545,8 @@ void GroovyMister::CmdBlit(uint32_t frame, uint8_t field, uint16_t vCountSync, u
 		else
 		{
 			uint32_t timeCalc = (m_network_ping + margin + m_emulationTime >= m_frameTime) ? 0 : m_network_ping + margin + m_emulationTime - m_streamTime;
-			vSync = (timeCalc == 0) ? 1 : m_vTotal - round(m_vTotal * timeCalc) / m_frameTime;
+			uint32_t vSyncCalc = (timeCalc == 0) ? 1 : m_vTotal - static_cast<uint32_t>(round(m_vTotal * timeCalc) / m_frameTime);
+			vSync = static_cast<uint16_t>(vSyncCalc);
 		}
 	}
 
@@ -1060,7 +1061,7 @@ inline void GroovyMister::setTimeEnd(void)
 uint32_t GroovyMister::DiffTime(void)
 {
 #ifdef _WIN32
-	return m_tickEnd.QuadPart - m_tickStart.QuadPart;
+	return static_cast<uint32_t>(m_tickEnd.QuadPart - m_tickStart.QuadPart);
 #else
 	uint32_t diffTime = 0;
 	timespec temp;

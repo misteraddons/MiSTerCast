@@ -36,7 +36,6 @@ namespace MiSTerCast
         private bool isInitialized = false;
         private bool isStreaming = false;
         HelpWindow helpWindow = null;
-        const string lastSaveFilename = "lastsave.dat";
         string currentSaveFilename = null;
         private DispatcherTimer statusTimer;
 
@@ -293,13 +292,16 @@ namespace MiSTerCast
             if (helpWindow == null)
             {
                 helpWindow = new HelpWindow();
-                if (!File.Exists(lastSaveFilename))
+                string lastSavePath = AppStateFile.ResolveLastSavePath(AppDomain.CurrentDomain.BaseDirectory);
+                if (!File.Exists(lastSavePath))
                 {
                     // Show help the first time MiSTerCast is opened
                     helpWindow.Show();
                     try
                     {
-                        File.Create(lastSaveFilename);
+                        using (File.Create(lastSavePath))
+                        {
+                        }
                     }
                     catch (Exception exception)
                     {
@@ -311,7 +313,7 @@ namespace MiSTerCast
                     try
                     {
                         currentSaveFilename = null;
-                        using (StreamReader sr = File.OpenText(lastSaveFilename))
+                        using (StreamReader sr = File.OpenText(lastSavePath))
                         {
                             if (!sr.EndOfStream)
                             {
@@ -374,7 +376,6 @@ namespace MiSTerCast
 
             try
             {
-                EnablePreviewCheckBox.IsChecked = false;
                 StreamStatusTextBlock.Text = "Status: Checking Groovy_MiSTer...";
                 var probe = await GroovyMisterProbe.ProbeAsync(target, 1000);
                 if (!probe.Success)
@@ -747,7 +748,8 @@ namespace MiSTerCast
             currentSaveFilename = fileName;
             try
             {
-                using (FileStream fs = File.OpenWrite(lastSaveFilename))
+                string lastSavePath = AppStateFile.ResolveLastSavePath(AppDomain.CurrentDomain.BaseDirectory);
+                using (FileStream fs = File.OpenWrite(lastSavePath))
                 {
                     using (StreamWriter sw = new StreamWriter(fs))
                     {
@@ -1022,6 +1024,12 @@ namespace MiSTerCast
 
         private void AutofillModelineButton_Click(object sender, RoutedEventArgs e)
         {
+            if (modelines == null || modelines.Count == 0)
+            {
+                Log("Auto fill failed: no modeline presets are loaded.", true);
+                return;
+            }
+
             ushort hactive;
             ushort vactive;
             if (!ushort.TryParse(hactiveTextBox.Text, out hactive) || !ushort.TryParse(vactiveTextBox.Text, out vactive))
@@ -1098,7 +1106,8 @@ namespace MiSTerCast
             List<Modeline> newModeLines = new List<Modeline>();
             try
             {
-                List<string> lines = new List<string>(File.ReadAllLines("modelines.dat"));
+                string modelinesPath = ModelineFile.ResolvePath(AppDomain.CurrentDomain.BaseDirectory, Directory.GetCurrentDirectory());
+                List<string> lines = new List<string>(File.ReadAllLines(modelinesPath));
 
                 for (int i = 0; i < lines.Count; i++)
                 {
@@ -1189,6 +1198,7 @@ namespace MiSTerCast
             }
             catch (Exception e)
             {
+                modelines = new List<Modeline>();
                 Log("Failed to read modelines.dat. " + e.Message, true);
             }
         }
@@ -1197,6 +1207,9 @@ namespace MiSTerCast
         {
             ModelinePresetsBox.Items.Clear();
             ModelinePresetsBox.Items.Add("Custom");
+            if (modelines == null)
+                modelines = new List<Modeline>();
+
             foreach (Modeline modeline in modelines)
             {
                 ModelinePresetsBox.Items.Add(modeline.name);

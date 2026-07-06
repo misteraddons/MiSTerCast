@@ -16,7 +16,7 @@
                 <RowDefinition Height="auto"/>
                 <RowDefinition Height="auto"/>
                 <RowDefinition Height="*"/>
-                <RowDefinition Height="180"/>
+                <RowDefinition Height="130"/>
                 <!--<RowDefinition Height="*"/>-->
             </Grid.RowDefinitions>
             <GroupBox Header="Controls" Grid.Row="0">
@@ -61,15 +61,16 @@
                 <GroupBox Header="Modeline Presets" Grid.Column="0">
                     <Grid>
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="*"/>
-                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-                        <ComboBox x:Name="ModelinePresetsBox" Grid.Row="0" Margin="10 10 10 10" Width="Auto" SelectedIndex="0" SelectionChanged="ModelinePresetsBox_SelectionChanged">
+                        <ComboBox x:Name="ModelinePresetsBox" Grid.Row="0" Margin="10 8 10 4" Width="Auto" SelectedIndex="0" SelectionChanged="ModelinePresetsBox_SelectionChanged">
                             <ComboBoxItem>320x240 NTSC (60Hz)</ComboBoxItem>
                         </ComboBox>
-                        <Button x:Name="ApplyModelineButton" IsEnabled="False" Grid.Row="1" Margin="10 10 10 10" Click="ApplyModelineButton_Click">Apply Modeline</Button>
-                        <Button x:Name="AutofillModelineButton" Grid.Row="2" Margin="10 10 10 10" Click="AutofillModelineButton_Click">Auto Fill</Button>
+                        <UniformGrid Grid.Row="1" Columns="2" Margin="10 4 10 8">
+                            <Button x:Name="ApplyModelineButton" IsEnabled="False" Margin="0 0 3 0" Click="ApplyModelineButton_Click">Apply</Button>
+                            <Button x:Name="AutofillModelineButton" Margin="3 0 0 0" Click="AutofillModelineButton_Click">Auto Fill</Button>
+                        </UniformGrid>
                     </Grid>
                 </GroupBox>
                 <GroupBox Header="Modeline" Grid.Column="1">
@@ -190,13 +191,13 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-                        <ComboBox x:Name="CaptureSourceBox" Grid.Row="0" Margin="10 10 10 0" Width="Auto" SelectedIndex="0" SelectionChanged="CaptureSource_SelectionChanged">
+                        <ComboBox x:Name="CaptureSourceBox" Grid.Row="0" Margin="10 6 10 0" Width="Auto" SelectedIndex="0" SelectionChanged="CaptureSource_SelectionChanged">
                             <ComboBoxItem>Display 1</ComboBoxItem>
                             <ComboBoxItem>Display 2</ComboBoxItem>
                             <ComboBoxItem>Display 3</ComboBoxItem>
                             <ComboBoxItem>Display 4</ComboBoxItem>
                         </ComboBox>
-                        <ComboBox x:Name="AlignmentBox" Grid.Row="1" Margin="10 10 10 0" Width="Auto" SelectedIndex="0" SelectionChanged="CaptureSource_SelectionChanged">
+                        <ComboBox x:Name="AlignmentBox" Grid.Row="1" Margin="10 6 10 0" Width="Auto" SelectedIndex="0" SelectionChanged="CaptureSource_SelectionChanged">
                             <ComboBoxItem>Centered</ComboBoxItem>
                             <ComboBoxItem>TopLeft</ComboBoxItem>
                             <ComboBoxItem>Top</ComboBoxItem>
@@ -207,14 +208,14 @@
                             <ComboBoxItem>BottomLeft</ComboBoxItem>
                             <ComboBoxItem>Left</ComboBoxItem>
                         </ComboBox>
-                        <ComboBox x:Name="RotateComboBox" Grid.Row="2" Margin="10 10 10 0" Width="Auto" SelectedIndex="0" SelectionChanged="CaptureSource_SelectionChanged">
+                        <ComboBox x:Name="RotateComboBox" Grid.Row="2" Margin="10 6 10 0" Width="Auto" SelectedIndex="0" SelectionChanged="CaptureSource_SelectionChanged">
                             <ComboBoxItem>No Rotate</ComboBoxItem>
                             <ComboBoxItem>90° CCW</ComboBoxItem>
                             <ComboBoxItem>90° CW</ComboBoxItem>
                             <ComboBoxItem>180°</ComboBoxItem>
                         </ComboBox>
-                        <CheckBox x:Name="EnableAudioCheckBox" Grid.Row="3" Margin="10 10 10 0" IsChecked="True" Checked="CaptureSource_Checked" Unchecked="CaptureSource_Checked">Enable Audio</CheckBox>
-                        <CheckBox x:Name="EnablePreviewCheckBox" Grid.Row="4" Margin="10 10 10 0" IsChecked="True" Checked="CaptureSource_Checked" Unchecked="CaptureSource_Checked">Enable Preview</CheckBox>
+                        <CheckBox x:Name="EnableAudioCheckBox" Grid.Row="3" Margin="10 6 10 0" IsChecked="True" Checked="CaptureSource_Checked" Unchecked="CaptureSource_Checked">Enable Audio</CheckBox>
+                        <CheckBox x:Name="EnablePreviewCheckBox" Grid.Row="4" Margin="10 6 10 0" IsChecked="True" Checked="CaptureSource_Checked" Unchecked="CaptureSource_Checked">Enable Preview</CheckBox>
                     </Grid>
                     <Grid Grid.Column="1" >
                         <Grid.RowDefinitions>
@@ -222,7 +223,7 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-                        <ComboBox x:Name="CropComboBox" Grid.Row="0" Margin="10 10 10 0" Width="Auto" SelectedIndex="0" SelectionChanged="CaptureSource_SelectionChanged">
+                        <ComboBox x:Name="CropComboBox" Grid.Row="0" Margin="10 6 10 0" Width="Auto" SelectedIndex="0" SelectionChanged="CaptureSource_SelectionChanged">
                             <ComboBoxItem>Custom Size</ComboBoxItem>
                             <ComboBoxItem>1X Crop</ComboBoxItem>
                             <ComboBoxItem>2X Crop</ComboBoxItem>
@@ -237,7 +238,7 @@
                                 <RowDefinition Height="auto"/>
                                 <RowDefinition Height="auto"/>
                             </Grid.RowDefinitions>
-                            <Grid Grid.Row="0" Margin="10 10 10 0">
+                            <Grid Grid.Row="0" Margin="10 6 10 0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
@@ -258,7 +259,7 @@
                                 <TextBox x:Name="CaptureYOffset" Grid.Column="2" Margin="4,4,4,4" PreviewTextInput="IntValidation" TextChanged="CaptureSource_TextChanged">0</TextBox>
                             </Grid>
                         </Grid>
-                        <UniformGrid Grid.Row="2" Columns="3" Margin="10 4 10 0">
+                        <UniformGrid Grid.Row="2" Columns="3" Margin="10 2 10 0">
                             <Button Margin="1" Tag="Native" Click="CaptureQuickButton_Click">Native</Button>
                             <Button Margin="1" Tag="Scale2" Click="CaptureQuickButton_Click">2x</Button>
                             <Button Margin="1" Tag="Scale3" Click="CaptureQuickButton_Click">3x</Button>

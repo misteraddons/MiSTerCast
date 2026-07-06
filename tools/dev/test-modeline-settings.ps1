@@ -102,6 +102,35 @@ namespace MiSTerCast
             if (loaded.AlignmentIndex != 0 || loaded.PreviewEnabled != true || loaded.RotationIndex != 3 || loaded.AudioEnabled != false || loaded.CropIndex != 5)
                 return Fail("version 1 settings should retain old fields and default new fields");
 
+            string baseDir = Path.Combine(Path.GetTempPath(), "mistercast-modeline-base-" + Guid.NewGuid().ToString("N"));
+            string currentDir = Path.Combine(Path.GetTempPath(), "mistercast-modeline-current-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(baseDir);
+            Directory.CreateDirectory(currentDir);
+            try
+            {
+                string expectedPath = Path.Combine(baseDir, "modelines.dat");
+                File.WriteAllText(expectedPath, "; modelines");
+                string actualPath = ModelineFile.ResolvePath(baseDir, currentDir);
+                if (!String.Equals(expectedPath, actualPath, StringComparison.OrdinalIgnoreCase))
+                    return Fail("modelines.dat should resolve from the executable directory before the current directory");
+
+                string expectedReadmePath = Path.Combine(baseDir, "README.txt");
+                File.WriteAllText(expectedReadmePath, "help");
+                actualPath = BundledFile.ResolvePath("README.txt", baseDir, currentDir);
+                if (!String.Equals(expectedReadmePath, actualPath, StringComparison.OrdinalIgnoreCase))
+                    return Fail("README.txt should resolve from the executable directory before the current directory");
+
+                string expectedLastSavePath = Path.Combine(baseDir, "lastsave.dat");
+                actualPath = AppStateFile.ResolveLastSavePath(baseDir);
+                if (!String.Equals(expectedLastSavePath, actualPath, StringComparison.OrdinalIgnoreCase))
+                    return Fail("lastsave.dat should resolve from the executable directory");
+            }
+            finally
+            {
+                Directory.Delete(baseDir, true);
+                Directory.Delete(currentDir, true);
+            }
+
             return 0;
         }
 
@@ -115,7 +144,10 @@ namespace MiSTerCast
 "@ | Set-Content -LiteralPath $testSource -Encoding UTF8
 
 & $csc /nologo /target:exe /out:$testExe `
+    (Join-Path $repoRoot "FrontEnd\AppStateFile.cs") `
     (Join-Path $repoRoot "FrontEnd\Modeline.cs") `
+    (Join-Path $repoRoot "FrontEnd\BundledFile.cs") `
+    (Join-Path $repoRoot "FrontEnd\ModelineFile.cs") `
     (Join-Path $repoRoot "FrontEnd\ModelineValidator.cs") `
     (Join-Path $repoRoot "FrontEnd\MiSTerCastSettings.cs") `
     $testSource

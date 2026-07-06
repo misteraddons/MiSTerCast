@@ -66,6 +66,20 @@ typedef void(__stdcall *log_function)(const char* message, bool error);
 
 typedef void(__stdcall *capture_image_function)(int width, int height, void* buffer);
 
+struct StreamStats {
+    UINT32 initialized;
+    UINT32 capturing;
+    UINT32 streaming;
+    UINT32 framesSubmitted;
+    UINT32 fpgaFrame;
+    UINT32 droppedFrames;
+    UINT32 fpgaVCount;
+    UINT32 fpgaAudio;
+    UINT32 fpgaSynced;
+    UINT32 streamFailed;
+    UINT32 streamError;
+};
+
 MISTERCASTLIB_API bool Initialize(log_function fnLog, capture_image_function fnCapture);
 
 MISTERCASTLIB_API bool Shutdown();
@@ -73,6 +87,8 @@ MISTERCASTLIB_API bool Shutdown();
 MISTERCASTLIB_API bool StartStream(const char* targetIp);
 
 MISTERCASTLIB_API bool StopStream();
+
+MISTERCASTLIB_API bool GetStreamStats(StreamStats* stats);
 
 MISTERCASTLIB_API bool SetModeline(
     double pclock,

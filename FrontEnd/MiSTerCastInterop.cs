@@ -28,6 +28,22 @@ namespace MiSTerCast
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
         public delegate void CaptureImageDelegate(int width, int height, IntPtr buffer);
 
+        [StructLayout(LayoutKind.Sequential)]
+        public struct StreamStats
+        {
+            public UInt32 initialized;
+            public UInt32 capturing;
+            public UInt32 streaming;
+            public UInt32 framesSubmitted;
+            public UInt32 fpgaFrame;
+            public UInt32 droppedFrames;
+            public UInt32 fpgaVCount;
+            public UInt32 fpgaAudio;
+            public UInt32 fpgaSynced;
+            public UInt32 streamFailed;
+            public UInt32 streamError;
+        }
+
         [DllImport("MISTERCASTLIB.dll", EntryPoint = "Initialize", CallingConvention = CallingConvention.Cdecl)]
         public static extern bool Initialize(LogDelegate logCallback, CaptureImageDelegate captureImageCallback);
 
@@ -39,6 +55,9 @@ namespace MiSTerCast
 
         [DllImport("MISTERCASTLIB.dll", EntryPoint = "StopStream", CallingConvention = CallingConvention.Cdecl)]
         public static extern bool StopStream();
+
+        [DllImport("MISTERCASTLIB.dll", EntryPoint = "GetStreamStats", CallingConvention = CallingConvention.Cdecl)]
+        public static extern bool GetStreamStats(out StreamStats stats);
 
         [DllImport("MISTERCASTLIB.dll", EntryPoint = "SetModeline", CallingConvention = CallingConvention.Cdecl)]
         public static extern bool SetModeline(

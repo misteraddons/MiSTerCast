@@ -68,7 +68,7 @@ public:
 
     ~renderer_nogpu();
     int create();
-    void draw();
+    bool draw();
     void save() {}
     void record() {}
     void toggle_fsfx() {}
@@ -85,6 +85,8 @@ private:
     int m_compression = 0;
     int m_frame = 0;
     int m_field = 0;
+    uint32_t m_last_fpga_frame = 0;
+    bool m_have_last_fpga_frame = false;
     unsigned int m_width = 0;
     unsigned int m_height = 0;
     int m_vtotal = 0;
@@ -138,7 +140,7 @@ renderer_nogpu::~renderer_nogpu()
 //============================================================
 //  renderer_nogpu::draw
 //============================================================
-void renderer_nogpu::draw()
+bool renderer_nogpu::draw()
 {
     // Hack because these aren't intiailized...
     m_width = selected_modeline.hactive;
@@ -176,12 +178,13 @@ void renderer_nogpu::draw()
         else
         {
             m_first_blit = false;
+            return false;
         }
     }
 
     // only send frame if nogpu is initialized
     if (!m_initialized)
-        return;
+        return false;
 
     m_frame++;
 
@@ -233,7 +236,7 @@ void renderer_nogpu::draw()
 
     char* fb = groovyMister.getPBufferBlit(m_field);
     if (!fb)
-        return;
+        return true;
 
     for (unsigned int i = 0; i < (pitch * m_height * 4); i += 4)
     {
@@ -295,7 +298,7 @@ void renderer_nogpu::draw()
         m_frame = 0;
 
         // Skip blitting first frame, so we avoid glitches while MAME loads roms
-        return;
+        return true;
     }
 
     int vsync_offset = 0;
@@ -324,12 +327,27 @@ void renderer_nogpu::draw()
     // Blit now
     groovyMister.CmdBlit(m_frame, m_field, 0/*m_vsync_scanline*/, 15000, 0);
     groovyMister.WaitSync();
+    uint32_t currentFpgaFrame = groovyMister.fpga.frame;
+    if (m_have_last_fpga_frame && currentFpgaFrame > m_last_fpga_frame)
+    {
+        uint32_t frameGap = currentFpgaFrame - m_last_fpga_frame;
+        if (frameGap > 1)
+            statsDroppedFrames.fetch_add(frameGap - 1);
+    }
+    m_last_fpga_frame = currentFpgaFrame;
+    m_have_last_fpga_frame = true;
+
+    statsFramesSubmitted = static_cast<unsigned int>(m_frame);
+    statsFpgaFrame = currentFpgaFrame;
+    statsFpgaVCount = groovyMister.fpga.vCount;
+    statsFpgaAudio = groovyMister.fpga.audio;
+    statsFpgaSynced = groovyMister.fpga.vramSynced;
 
     time_blit = CurrentTicks();
     nogpu_register_frametime(time_entry - time_exit);
     time_exit = CurrentTicks();
 
-    return;
+    return true;
 }
 
 //============================================================
@@ -368,7 +386,11 @@ bool renderer_nogpu::nogpu_init()
     }
     else
     {
-        LogMessage("Groovy MiSTer API failed to initialize!");
+        statsStreamError = static_cast<unsigned int>(-ret);
+        if (ret == -23)
+            LogMessage("Groovy MiSTer API failed to initialize: no UDP ACK from " + m_targetip + ":" + std::to_string(UDP_PORT) + ".", true);
+        else
+            LogMessage("Groovy MiSTer API failed to initialize: error " + std::to_string(ret) + ".", true);
         return false;
     }
 }

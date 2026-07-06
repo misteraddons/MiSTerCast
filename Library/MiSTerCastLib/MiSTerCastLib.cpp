@@ -16,6 +16,14 @@ void LogMessage(std::string message, bool error)
 std::atomic_bool stopCapture = false;
 std::atomic_bool stopStream = false;
 std::string targetIpString;
+std::atomic_uint statsFramesSubmitted = 0;
+std::atomic_uint statsFpgaFrame = 0;
+std::atomic_uint statsDroppedFrames = 0;
+std::atomic_uint statsFpgaVCount = 0;
+std::atomic_uint statsFpgaAudio = 0;
+std::atomic_uint statsFpgaSynced = 0;
+std::atomic_bool statsStreamFailed = false;
+std::atomic_uint statsStreamError = 0;
 
 #include "groovymister.h"
 #include "renderer_nogpu.h"
@@ -36,32 +44,48 @@ void capture_screen()
 std::atomic_bool casting_screen = false;
 void cast_screen()
 {
-    if (!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST))
-    {
-        LogMessage("Setting cast screen thread priority failed: " + std::to_string(GetLastError()), true);
-    }
+    bool audioStarted = false;
 
-    if (source_config.audio)
+    try
     {
-        LogMessage("Audio capture starting.");
-        StartAudioCapture();
-    }
-
-    LogMessage("Casting to MiSTer starting.");
-    casting_screen = true;
-    {
-        auto renderer = std::make_unique<renderer_nogpu>(targetIpString);
+        if (!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST))
         {
-            while (!stopStream)
+            LogMessage("Setting cast screen thread priority failed: " + std::to_string(GetLastError()), true);
+        }
+
+        if (source_config.audio)
+        {
+            LogMessage("Audio capture starting.");
+            StartAudioCapture();
+            audioStarted = true;
+        }
+
+        LogMessage("Casting to MiSTer starting.");
+        casting_screen = true;
+        auto renderer = std::make_unique<renderer_nogpu>(targetIpString);
+        while (!stopStream)
+        {
+            if (!renderer->draw())
             {
-                renderer->draw();
+                statsStreamFailed = true;
+                if (statsStreamError == 0)
+                    statsStreamError = 1;
+                LogMessage("Stream startup failed.", true);
+                break;
             }
         }
     }
+    catch (...)
+    {
+        statsStreamFailed = true;
+        statsStreamError = 100;
+        LogMessage("Stream thread failed unexpectedly.", true);
+    }
+
     casting_screen = false;
     LogMessage("Casting to MiSTer stopped.");
 
-    if (source_config.audio)
+    if (audioStarted)
     {
         StopAudioCapture();
         LogMessage("Audio capture stopped.");
@@ -139,8 +163,34 @@ std::unique_ptr<std::thread> castScreenTask;
 
 MISTERCASTLIB_API bool StartStream(const char* targetIp)
 {
+    if (casting_screen)
+    {
+        LogMessage("Stream is already running.", true);
+        return false;
+    }
+
+    if (castScreenTask && castScreenTask->joinable())
+        castScreenTask->join();
+
+    if (targetIp == nullptr || targetIp[0] == '\0')
+    {
+        statsStreamFailed = true;
+        statsStreamError = 101;
+        LogMessage("Starting stream failed: target IP is empty.", true);
+        return false;
+    }
+
     LogMessage("Starting stream.");
+    stopStream = false;
+    statsStreamFailed = false;
+    statsStreamError = 0;
     targetIpString = std::string(targetIp);
+    statsFramesSubmitted = 0;
+    statsFpgaFrame = 0;
+    statsDroppedFrames = 0;
+    statsFpgaVCount = 0;
+    statsFpgaAudio = 0;
+    statsFpgaSynced = 0;
     castScreenTask = std::make_unique<std::thread>(cast_screen);
 
     return true;
@@ -153,6 +203,26 @@ MISTERCASTLIB_API bool StopStream()
     if (castScreenTask && castScreenTask->joinable())
         castScreenTask->join();
     stopStream = false;
+    return true;
+}
+
+MISTERCASTLIB_API bool GetStreamStats(StreamStats* stats)
+{
+    if (stats == nullptr)
+        return false;
+
+    stats->initialized = initialized ? 1 : 0;
+    stats->capturing = capturing_screen ? 1 : 0;
+    stats->streaming = casting_screen ? 1 : 0;
+    stats->framesSubmitted = statsFramesSubmitted.load();
+    stats->fpgaFrame = statsFpgaFrame.load();
+    stats->droppedFrames = statsDroppedFrames.load();
+    stats->fpgaVCount = statsFpgaVCount.load();
+    stats->fpgaAudio = statsFpgaAudio.load();
+    stats->fpgaSynced = statsFpgaSynced.load();
+    stats->streamFailed = statsStreamFailed ? 1 : 0;
+    stats->streamError = statsStreamError.load();
+
     return true;
 }
 

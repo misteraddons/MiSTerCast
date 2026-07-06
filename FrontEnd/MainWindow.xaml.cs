@@ -12,6 +12,7 @@ using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using System.Globalization;
 using System.Net;
+using System.Windows.Threading;
 
 namespace MiSTerCast
 {
@@ -51,6 +52,7 @@ namespace MiSTerCast
         HelpWindow helpWindow = null;
         const string lastSaveFilename = "lastsave.dat";
         string currentSaveFilename = null;
+        private DispatcherTimer statusTimer;
 
         private void InitializeMiSTerCast()
         {
@@ -71,6 +73,123 @@ namespace MiSTerCast
             ReadModelinesFile();
             PopulateModelineDropdown();
             InitializeMiSTerCast();
+            statusTimer = new DispatcherTimer();
+            statusTimer.Interval = TimeSpan.FromMilliseconds(500);
+            statusTimer.Tick += StatusTimer_Tick;
+            statusTimer.Start();
+            UpdateStreamStatus();
+        }
+
+        private void StatusTimer_Tick(object sender, EventArgs e)
+        {
+            UpdateStreamStatus();
+        }
+
+        private void UpdateStreamStatus()
+        {
+            MiSTerCastInterop.StreamStats stats;
+            if (!MiSTerCastInterop.GetStreamStats(out stats))
+            {
+                StreamStatusTextBlock.Text = "Status: Unavailable";
+                return;
+            }
+
+            if (stats.streamFailed != 0)
+            {
+                if (isStreaming)
+                {
+                    MiSTerCastInterop.StopStream();
+                    SetStreamControls(false);
+                }
+                StreamStatusTextBlock.Text = "Status: Stream failed - " + DescribeStreamError(stats.streamError);
+                return;
+            }
+
+            if (stats.streaming != 0)
+            {
+                StreamStatusTextBlock.Text = StreamStatusFormatter.Format(stats, EnableAudioCheckBox.IsChecked == true);
+            }
+            else if (stats.capturing != 0)
+            {
+                StreamStatusTextBlock.Text = "Status: Ready";
+            }
+            else if (stats.initialized != 0)
+            {
+                StreamStatusTextBlock.Text = "Status: Initialized";
+            }
+            else
+            {
+                StreamStatusTextBlock.Text = "Status: Not initialized";
+            }
+        }
+
+        private void SetStreamControls(bool streaming)
+        {
+            isStreaming = streaming;
+            ToggleStreamButton.Content = streaming ? "Stop Stream" : "Start Stream";
+            CaptureSourceBox.IsEnabled = !streaming;
+            EnableAudioCheckBox.IsEnabled = !streaming;
+            TestTargetButton.IsEnabled = !streaming;
+            if (!streaming)
+                ApplyModelineButton.IsEnabled = false;
+        }
+
+        private string DescribeStreamError(UInt32 error)
+        {
+            switch (error)
+            {
+                case 23:
+                    return "no UDP ACK from MiSTer; use Test Target";
+                case 100:
+                    return "native stream thread error";
+                case 101:
+                    return "target IP is empty";
+                case 0:
+                    return "startup failed";
+                default:
+                    return "native error " + error;
+            }
+        }
+
+        private async void TestTargetButton_Click(object sender, RoutedEventArgs e)
+        {
+            TestTargetButton.IsEnabled = false;
+            StreamStatusTextBlock.Text = "Status: Testing target...";
+
+            try
+            {
+                var result = await GroovyMisterProbe.ProbeAsync(TargetIpAddresTextBox.Text);
+                if (result.Success)
+                {
+                    StreamStatusTextBlock.Text = String.Format(
+                        "Status: Groovy_MiSTer detected at {0}:{1}",
+                        result.Address,
+                        result.Port);
+                    Log(String.Format(
+                        "Groovy_MiSTer detected at {0}:{1}. frame={2}, vcount={3}, status=0x{4:X2}",
+                        result.Address,
+                        result.Port,
+                        result.Frame,
+                        result.VCount,
+                        result.StatusBits));
+                }
+                else
+                {
+                    StreamStatusTextBlock.Text = "Status: Target test failed - " + result.Message;
+                    Log(String.Format("Target test failed for {0}:{1}: {2}", result.Address, result.Port, result.Message), true);
+                    Log("Check that Groovy.rbf is loaded, MiSTer_groovy is installed and configured in MiSTer.ini, UDP 32100 is reachable, and a direct gigabit connection is preferred.", true);
+                }
+            }
+            catch (Exception exception)
+            {
+                StreamStatusTextBlock.Text = "Status: Target test failed";
+                Log("Target test failed: " + exception.Message, true);
+            }
+            finally
+            {
+                if (!isStreaming)
+                    TestTargetButton.IsEnabled = true;
+            }
         }
 
         void MainWindow_Closing(object sender, CancelEventArgs e)
@@ -151,11 +270,7 @@ namespace MiSTerCast
             {
                 if (MiSTerCastInterop.StopStream())
                 {
-                    isStreaming = false;
-                    ToggleStreamButton.Content = "Start Stream";
-                    CaptureSourceBox.IsEnabled = true;
-                    EnableAudioCheckBox.IsEnabled = true;
-                    ApplyModelineButton.IsEnabled = false;
+                    SetStreamControls(false);
                 }
             }
             else
@@ -190,10 +305,7 @@ namespace MiSTerCast
 
                     if (MiSTerCastInterop.StartStream(ipAddress.ToString()))
                     {
-                        isStreaming = true;
-                        ToggleStreamButton.Content = "Stop Stream";
-                        CaptureSourceBox.IsEnabled = false;
-                        EnableAudioCheckBox.IsEnabled = false;
+                        SetStreamControls(true);
                     }
                 }
             }

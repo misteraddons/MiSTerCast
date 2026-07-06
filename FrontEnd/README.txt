@@ -4,7 +4,7 @@ MiSTerCast is a general-purpose tool for streaming your PC screen to your MiSTer
 
 Make sure you already have Groovy_Mame working well with Groovy_MiSTer before using MiSTerCast. A direct ethernet connection to your MiSTer is recommended.
 <Hyperlink>https://github.com/lutechsource/MiSTerStuff/blob/main/GroovyMiSTer/mame_documentation.md</Hyperlink>
-<Hyperlink>https://github.com/psakhis/Groovy_MiSTer</Hyperlink>
+<Hyperlink>https://github.com/iequalshane/Groovy_MiSTer</Hyperlink>
 
 For audio, you will need to enable audio on the Groovy_MiSTer core.
 

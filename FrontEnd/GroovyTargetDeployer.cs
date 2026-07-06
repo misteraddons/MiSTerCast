@@ -45,6 +45,15 @@ namespace MiSTerCast
                 : "Groovy RBF not found on target.");
 
             GroovyTargetDeploymentPlan plan = GroovyTargetConfigurator.CreateDeploymentPlan(inventory, config.ForceRedeploy);
+            if (plan.UploadMisterBinary &&
+                String.IsNullOrWhiteSpace(config.MisterBinaryPath) &&
+                inventory.HasMisterBinary)
+            {
+                Log(log, "No downloaded MiSTer_groovy was provided; reusing target binary: " + inventory.MisterBinaryPath);
+                plan.UploadMisterBinary = false;
+                plan.RemoteMisterBinaryPath = inventory.MisterBinaryPath;
+                plan.MisterMainName = GroovyTargetConfigurator.RemoteFileName(inventory.MisterBinaryPath);
+            }
             GroovyTargetConfigurator.ValidateDeploymentConfig(config, plan);
 
             await RunRequiredPlinkAsync(plinkPath, config, "Preparing target folders", "mkdir -p /media/fat/_Utility", log, hostKeyIds);

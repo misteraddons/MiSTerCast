@@ -95,7 +95,6 @@
     <Compile Include="Modeline.cs" />
     <Compile Include="ModelineAutofill.cs" />
     <Compile Include="ModelineFile.cs" />
-    <Compile Include="ModelineValidator.cs" />
     <Compile Include="NetworkTargetScanner.cs" />
     <Compile Include="StreamStatusFormatter.cs" />
     <Compile Include="MainWindow.xaml.cs">

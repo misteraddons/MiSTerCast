@@ -308,7 +308,8 @@ int GroovyMister::CmdInit(const char* misterHost, uint16_t misterPort, int lz4Fr
 		return true;
 	};
 
-retry_socket_init:
+	for (;;)
+	{
 	rc = ::WSAStartup(MAKEWORD(2, 2), &wsd);
 	if (rc != 0)
 	{
@@ -328,7 +329,7 @@ retry_socket_init:
 			LOG(0,"[MiSTer] Could not create socket : %lu", ::GetLastError());
 			if (fallbackToStandardUdp("RIO socket setup failed"))
 			{
-				goto retry_socket_init;
+				continue;
 			}
 			return -1;
 		}
@@ -340,7 +341,7 @@ retry_socket_init:
 		        LOG(0,"[MiSTer] Could not create IP_DONTFRAGMENT : %lu", ::GetLastError());
 		        if (fallbackToStandardUdp("RIO socket option setup failed"))
 		        {
-			        goto retry_socket_init;
+			        continue;
 		        }
 		        return -1;
 		}
@@ -353,7 +354,7 @@ retry_socket_init:
 			LOG(0,"[MiSTer] Could not create WSAIoctl : %lu", ::GetLastError());
 			if (fallbackToStandardUdp("RIO extension lookup failed"))
 			{
-				goto retry_socket_init;
+				continue;
 			}
 			return -1;
 		}
@@ -364,7 +365,7 @@ retry_socket_init:
 			LOG(0,"[MiSTer] Could not create m_hIOCP IoCompletionPort : %lu", ::GetLastError());
 			if (fallbackToStandardUdp("RIO completion port setup failed"))
 			{
-				goto retry_socket_init;
+				continue;
 			}
 			return -1;
 		}
@@ -386,7 +387,7 @@ retry_socket_init:
 			LOG(0,"[MiSTer] RIORegisterBuffer m_BufferSend Error: %lu\n", ::GetLastError());
 			if (fallbackToStandardUdp("RIO buffer registration failed"))
 			{
-				goto retry_socket_init;
+				continue;
 			}
 			return -1;
 		}
@@ -400,7 +401,7 @@ retry_socket_init:
 			LOG(0,"[MiSTer] RIORegisterBuffer m_BufferReceive Error: %lu\n", ::GetLastError());
 			if (fallbackToStandardUdp("RIO buffer registration failed"))
 			{
-				goto retry_socket_init;
+				continue;
 			}
 			return -1;
 		}
@@ -409,6 +410,7 @@ retry_socket_init:
 		m_receiveRioBuffer.Length = sizeof(m_bufferReceive);
 		
 		DWORD offset = 0;
+		bool retrySocketInit = false;
 		for (int field = 0; field < 2; field++)
 		{
 			if (lz4Frames)
@@ -424,7 +426,8 @@ retry_socket_init:
 				LOG(0,"[MiSTer] RIORegisterBuffer pBufferBlit[%d] Error: %lu\n", field, ::GetLastError());
 				if (fallbackToStandardUdp("RIO buffer registration failed"))
 				{
-					goto retry_socket_init;
+					retrySocketInit = true;
+					break;
 				}
 				return -1;
 			}
@@ -442,13 +445,17 @@ retry_socket_init:
 				offset += m_mtu;
 			}
 		}
+		if (retrySocketInit)
+		{
+			continue;
+		}
 		m_sendRioBufferAudioId = m_rio.RIORegisterBuffer(m_pBufferAudio, BUFFER_SIZE);
 		if (m_sendRioBufferAudioId == RIO_INVALID_BUFFERID)
 		{
 			LOG(0,"[MiSTer] RIORegisterBuffer pBufferAudio Error: %lu\n", ::GetLastError());
 			if (fallbackToStandardUdp("RIO buffer registration failed"))
 			{
-				goto retry_socket_init;
+				continue;
 			}
 			return -1;
 		}
@@ -472,7 +479,7 @@ retry_socket_init:
 			LOG(0,"[MiSTer]Could not create m_sendQueue : %lu", ::GetLastError());
 			if (fallbackToStandardUdp("RIO queue setup failed"))
 			{
-				goto retry_socket_init;
+				continue;
 			}
 			return -1;
 		}
@@ -483,7 +490,7 @@ retry_socket_init:
 			LOG(0,"[MiSTer]Could not create m_receiveQueue : %lu", ::GetLastError());
 			if (fallbackToStandardUdp("RIO queue setup failed"))
 			{
-				goto retry_socket_init;
+				continue;
 			}
 			return -1;
 		}
@@ -494,7 +501,7 @@ retry_socket_init:
 			LOG(0,"[MiSTer]Could not create m_requestQueue : %lu", ::GetLastError());
 			if (fallbackToStandardUdp("RIO queue setup failed"))
 			{
-				goto retry_socket_init;
+				continue;
 			}
 			return -1;
 		}
@@ -505,7 +512,7 @@ retry_socket_init:
 			LOG(0,"[MiSTer] Could not connect : %lu", ::GetLastError());
 			if (fallbackToStandardUdp("RIO connect failed"))
 			{
-				goto retry_socket_init;
+				continue;
 			}
 			return -1;
 		}
@@ -604,7 +611,7 @@ retry_socket_init:
 	#ifdef _WIN32
 		if (fallbackToStandardUdp("RIO startup did not receive ACK"))
 		{
-			goto retry_socket_init;
+			continue;
 		}
 	#endif
 		CmdClose();
@@ -640,6 +647,9 @@ retry_socket_init:
 		m_isConnected = 1;
 		return 0;
 	}
+#ifdef _WIN32
+	}
+#endif
 
 }
 

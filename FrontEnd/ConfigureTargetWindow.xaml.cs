@@ -55,10 +55,13 @@ namespace MiSTerCast
                     ReleaseStatusTextBlock.Text = message;
                 });
 
-                MisterBinaryPathTextBox.Text = release.MisterBinaryPath;
+                if (!String.IsNullOrWhiteSpace(release.MisterBinaryPath))
+                    MisterBinaryPathTextBox.Text = release.MisterBinaryPath;
                 GroovyRbfPathTextBox.Text = release.GroovyRbfPath;
                 downloadedRelease = release;
-                ReleaseStatusTextBlock.Text = "Ready: " + release.DisplayName;
+                ReleaseStatusTextBlock.Text = String.IsNullOrWhiteSpace(release.MisterBinaryPath)
+                    ? "Ready: " + release.DisplayName + " (RBF only)"
+                    : "Ready: " + release.DisplayName;
             }
             catch (Exception exception)
             {
@@ -138,7 +141,8 @@ namespace MiSTerCast
         private GroovyTargetManifest CreateReleaseManifest()
         {
             if (downloadedRelease != null &&
-                String.Equals(MisterBinaryPathTextBox.Text.Trim(), downloadedRelease.MisterBinaryPath, StringComparison.OrdinalIgnoreCase) &&
+                (String.IsNullOrWhiteSpace(downloadedRelease.MisterBinaryPath) ||
+                    String.Equals(MisterBinaryPathTextBox.Text.Trim(), downloadedRelease.MisterBinaryPath, StringComparison.OrdinalIgnoreCase)) &&
                 String.Equals(GroovyRbfPathTextBox.Text.Trim(), downloadedRelease.GroovyRbfPath, StringComparison.OrdinalIgnoreCase))
                 return GroovyTargetManifest.FromRelease(downloadedRelease);
 

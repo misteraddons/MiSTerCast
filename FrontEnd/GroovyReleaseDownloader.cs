@@ -37,13 +37,17 @@ namespace MiSTerCast
 
         public bool IsCached
         {
-            get { return File.Exists(MisterBinaryPath) && File.Exists(GroovyRbfPath); }
+            get
+            {
+                bool misterCached = String.IsNullOrWhiteSpace(MisterBinaryPath) || File.Exists(MisterBinaryPath);
+                return misterCached && File.Exists(GroovyRbfPath);
+            }
         }
     }
 
     class GroovyReleaseDownloader
     {
-        private const string LatestReleaseUrl = "https://api.github.com/repos/psakhis/Groovy_MiSTer/releases/latest";
+        private const string LatestReleaseUrl = "https://api.github.com/repos/iequalshane/Groovy_MiSTer/releases/latest";
 
         public string CacheRoot { get; private set; }
 
@@ -63,7 +67,11 @@ namespace MiSTerCast
             GroovyReleaseInfo release = await GetLatestReleaseAsync();
             Directory.CreateDirectory(release.CacheDirectory);
 
-            if (!File.Exists(release.MisterBinaryPath))
+            if (String.IsNullOrWhiteSpace(release.MisterAssetUrl))
+            {
+                Log(log, "Latest Groovy_MiSTer release does not include MiSTer_groovy; keeping the configured/local binary path.");
+            }
+            else if (!File.Exists(release.MisterBinaryPath))
             {
                 Log(log, "Downloading " + release.MisterAssetName + "...");
                 await DownloadFileAsync(release.MisterAssetUrl, release.MisterBinaryPath);
@@ -122,24 +130,23 @@ namespace MiSTerCast
                 .OrderByDescending(a => a.Name, StringComparer.OrdinalIgnoreCase)
                 .FirstOrDefault();
 
-            if (misterAsset == null || String.IsNullOrWhiteSpace(misterAsset.BrowserDownloadUrl))
-                throw new InvalidOperationException("Latest Groovy_MiSTer release does not include MiSTer_groovy.");
             if (rbfAsset == null || String.IsNullOrWhiteSpace(rbfAsset.BrowserDownloadUrl))
                 throw new InvalidOperationException("Latest Groovy_MiSTer release does not include a Groovy RBF.");
 
             string tag = String.IsNullOrWhiteSpace(response.TagName) ? "latest" : response.TagName;
             string cacheDirectory = Path.Combine(cacheRoot, SanitizePathSegment(tag));
+            string misterAssetName = misterAsset == null ? "" : misterAsset.Name;
             return new GroovyReleaseInfo
             {
                 TagName = response.TagName,
                 Name = response.Name,
                 PublishedAt = response.PublishedAt,
                 CacheDirectory = cacheDirectory,
-                MisterAssetName = misterAsset.Name,
-                MisterAssetUrl = misterAsset.BrowserDownloadUrl,
+                MisterAssetName = misterAssetName,
+                MisterAssetUrl = misterAsset == null ? "" : misterAsset.BrowserDownloadUrl,
                 RbfAssetName = rbfAsset.Name,
                 RbfAssetUrl = rbfAsset.BrowserDownloadUrl,
-                MisterBinaryPath = Path.Combine(cacheDirectory, misterAsset.Name),
+                MisterBinaryPath = String.IsNullOrWhiteSpace(misterAssetName) ? "" : Path.Combine(cacheDirectory, misterAssetName),
                 GroovyRbfPath = Path.Combine(cacheDirectory, rbfAsset.Name)
             };
         }

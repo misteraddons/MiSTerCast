@@ -14,27 +14,16 @@ namespace MiSTerCast
                 return false;
             }
 
-            if (!ModelineValidator.TryValidate(template, out error))
-            {
-                error = "Template modeline is invalid: " + error;
-                return false;
-            }
+            int hbegin = hactive + (template.hbegin - template.hactive);
+            int hend = hbegin + (template.hend - template.hbegin);
+            int htotal = hend + (template.htotal - template.hend);
+            int vbegin = vactive + (template.vbegin - template.vactive);
+            int vend = vbegin + (template.vend - template.vbegin);
+            int vtotal = vend + (template.vtotal - template.vend);
 
-            int hFrontPorch = template.hbegin - template.hactive;
-            int hSyncWidth = template.hend - template.hbegin;
-            int hBackPorch = template.htotal - template.hend;
-            int vFrontPorch = template.vbegin - template.vactive;
-            int vSyncWidth = template.vend - template.vbegin;
-            int vBackPorch = template.vtotal - template.vend;
-
-            int hbegin = hactive + hFrontPorch;
-            int hend = hbegin + hSyncWidth;
-            int htotal = hend + hBackPorch;
-            int vbegin = vactive + vFrontPorch;
-            int vend = vbegin + vSyncWidth;
-            int vtotal = vend + vBackPorch;
-
-            if (htotal > ushort.MaxValue || vtotal > ushort.MaxValue)
+            if (hbegin < 0 || hend < 0 || htotal <= 0 || vbegin < 0 || vend < 0 || vtotal <= 0 ||
+                hbegin > ushort.MaxValue || hend > ushort.MaxValue || htotal > ushort.MaxValue ||
+                vbegin > ushort.MaxValue || vend > ushort.MaxValue || vtotal > ushort.MaxValue)
             {
                 error = "Autofilled timings exceed the supported range.";
                 return false;
@@ -58,12 +47,7 @@ namespace MiSTerCast
                 interlace = interlace
             };
 
-            if (!ModelineValidator.TryValidate(modeline, out error))
-            {
-                error = "Autofilled modeline is invalid: " + error;
-                return false;
-            }
-
+            error = "";
             return true;
         }
 

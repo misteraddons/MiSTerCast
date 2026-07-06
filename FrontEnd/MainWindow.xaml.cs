@@ -518,7 +518,8 @@ namespace MiSTerCast
         {
             var downloader = new GroovyReleaseDownloader();
             GroovyReleaseInfo release = await downloader.DownloadLatestAsync(Log);
-            config.MisterBinaryPath = release.MisterBinaryPath;
+            if (!String.IsNullOrWhiteSpace(release.MisterBinaryPath))
+                config.MisterBinaryPath = release.MisterBinaryPath;
             config.GroovyRbfPath = release.GroovyRbfPath;
             config.ReleaseManifest = GroovyTargetManifest.FromRelease(release);
             config.ForceRedeploy = forceRedeploy;
@@ -999,14 +1000,6 @@ namespace MiSTerCast
             ushort.TryParse(vtotalTextBox.Text, out currentModeLine.vtotal);
             currentModeLine.interlace = interlacedCheckBox.IsChecked.Value;
 
-            string error;
-            if (!ModelineValidator.TryValidate(currentModeLine, out error))
-            {
-                if (isInitialized)
-                    Log("Invalid modeline: " + error, true);
-                return false;
-            }
-
             if (isInitialized)
             {
                 MiSTerCastInterop.SetModeline(
@@ -1180,16 +1173,7 @@ namespace MiSTerCast
                                     else
                                     {
                                         modeline.interlace = interlace != 0;
-                                        string validationError;
-                                        if (!ModelineValidator.TryValidate(modeline, out validationError))
-                                        {
-                                            Log("Invalid modeline values: " + lines[i] + " (" + validationError + ")", true);
-                                            badLine = true;
-                                        }
-                                        else
-                                        {
-                                            newModeLines.Add(modeline);
-                                        }
+                                        newModeLines.Add(modeline);
                                     }
                                 }
                             }

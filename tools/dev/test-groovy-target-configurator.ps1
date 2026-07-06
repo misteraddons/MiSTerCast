@@ -25,6 +25,7 @@ namespace MiSTerCast
             AssertContains(inventoryCommand, "tr '[:upper:]' '[:lower:]'", "inventory command must compare names case-insensitively");
             AssertContains(inventoryCommand, "groovy*.rbf", "inventory command must look for Groovy RBF variants");
             AssertContains(inventoryCommand, "mister_groovy", "inventory command must look for MiSTer_groovy case-insensitively");
+            AssertContains(inventoryCommand, "/media/fat/`$main", "inventory command must prefer MiSTer.ini [Groovy] main when present");
 
             var inventory = GroovyTargetConfigurator.ParseInventoryOutput(
                 "MISTER=/media/fat/mister_groovy\nRBF=/media/fat/_Utility/Groovy_20250922.RBF\n");
@@ -40,6 +41,14 @@ namespace MiSTerCast
                 return Fail("existing RBF path should be used for launch");
             if (existingPlan.MisterMainName != "mister_groovy")
                 return Fail("existing MiSTer binary basename should be preserved for MiSTer.ini");
+
+            var configuredInventory = GroovyTargetConfigurator.ParseInventoryOutput(
+                "MISTER=/media/fat/MiSTer_groovy_mistercast_test\nRBF=/media/fat/_Utility/Groovy.rbf\n");
+            var configuredPlan = GroovyTargetConfigurator.CreateDeploymentPlan(configuredInventory, false);
+            if (configuredPlan.UploadMisterBinary)
+                return Fail("configured sidecar MiSTer_groovy should not be uploaded without force");
+            if (configuredPlan.MisterMainName != "MiSTer_groovy_mistercast_test")
+                return Fail("configured sidecar MiSTer binary basename should be preserved for MiSTer.ini");
 
             var missingPlan = GroovyTargetConfigurator.CreateDeploymentPlan(new GroovyTargetInventory(), false);
             if (!missingPlan.UploadMisterBinary || !missingPlan.UploadGroovyRbf)

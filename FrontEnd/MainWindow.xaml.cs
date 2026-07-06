@@ -377,20 +377,15 @@ namespace MiSTerCast
             try
             {
                 StreamStatusTextBlock.Text = "Status: Checking Groovy_MiSTer...";
-                var probe = await GroovyMisterProbe.ProbeAsync(target, 1000);
-                if (!probe.Success)
+                bool ready = await EnsureGroovyReadyForStreamingAsync(target);
+                if (!ready)
                 {
-                    Log("Groovy_MiSTer is not responding; checking target setup...");
-                    bool ready = await EnsureGroovyReadyForStreamingAsync(target);
-                    if (!ready)
-                    {
-                        StreamStatusTextBlock.Text = "Status: Start Stream canceled";
-                        return;
-                    }
-
-                    if (!TryResolveTargetIpAddress(target, out ipAddress))
-                        return;
+                    StreamStatusTextBlock.Text = "Status: Start Stream canceled";
+                    return;
                 }
+
+                if (!TryResolveTargetIpAddress(target, out ipAddress))
+                    return;
 
                 if (MiSTerCastInterop.StartStream(ipAddress.ToString()))
                     SetStreamControls(true);
@@ -427,7 +422,7 @@ namespace MiSTerCast
                 if (action == GroovyStreamRepairAction.OfferUpdateOrLaunchExisting)
                     return await PromptUnknownVersionUpdateOrLaunchAsync(config, latestRelease);
 
-                return await LaunchExistingAndWaitAsync(config, deployer);
+                return await UseRunningOrLaunchExistingAsync(config, deployer);
             }
             catch (Exception exception)
             {
@@ -479,7 +474,7 @@ namespace MiSTerCast
             MessageBoxResult result = MessageBox.Show(
                 this,
                 "Installed Groovy_MiSTer is " + installed + "; latest is " + latestRelease.TagName + "." + Environment.NewLine +
-                "Yes = update and start, No = launch installed version, Cancel = stop.",
+                "Yes = update and start, No = use installed version, Cancel = stop.",
                 "Start Stream",
                 MessageBoxButton.YesNoCancel,
                 MessageBoxImage.Question);
@@ -488,7 +483,7 @@ namespace MiSTerCast
             if (result == MessageBoxResult.Yes)
                 return await DeployLatestAndWaitAsync(config, forceRedeploy: true);
 
-            return await LaunchExistingAndWaitAsync(config, new GroovyTargetDeployer());
+            return await UseRunningOrLaunchExistingAsync(config, new GroovyTargetDeployer());
         }
 
         private async Task<bool> PromptUnknownVersionUpdateOrLaunchAsync(GroovyTargetDeploymentConfig config, GroovyReleaseInfo latestRelease)
@@ -496,7 +491,7 @@ namespace MiSTerCast
             MessageBoxResult result = MessageBox.Show(
                 this,
                 "Groovy_MiSTer is installed, but MiSTerCast does not know its release version." + Environment.NewLine +
-                "Yes = update to latest and start, No = launch installed version, Cancel = stop.",
+                "Yes = update to latest and start, No = use installed version, Cancel = stop.",
                 "Start Stream",
                 MessageBoxButton.YesNoCancel,
                 MessageBoxImage.Question);
@@ -505,7 +500,7 @@ namespace MiSTerCast
             if (result == MessageBoxResult.Yes)
                 return await DeployLatestAndWaitAsync(config, forceRedeploy: true);
 
-            return await LaunchExistingAndWaitAsync(config, new GroovyTargetDeployer());
+            return await UseRunningOrLaunchExistingAsync(config, new GroovyTargetDeployer());
         }
 
         private async Task<bool> PromptConfigureTargetAsync(string message)
@@ -532,8 +527,25 @@ namespace MiSTerCast
             return await WaitForGroovyAfterLaunchAsync(config.Target);
         }
 
-        private async Task<bool> LaunchExistingAndWaitAsync(GroovyTargetDeploymentConfig config, GroovyTargetDeployer deployer)
+        private async Task<bool> UseRunningOrLaunchExistingAsync(GroovyTargetDeploymentConfig config, GroovyTargetDeployer deployer)
         {
+            var probe = await GroovyMisterProbe.ProbeAsync(config.Target, 1000);
+            if (probe.Success)
+            {
+                StreamStatusTextBlock.Text = String.Format(
+                    "Status: Groovy_MiSTer already running at {0}:{1}",
+                    probe.Address,
+                    probe.Port);
+                Log(String.Format(
+                    "Groovy_MiSTer already running at {0}:{1}. frame={2}, vcount={3}, status=0x{4:X2}",
+                    probe.Address,
+                    probe.Port,
+                    probe.Frame,
+                    probe.VCount,
+                    probe.StatusBits));
+                return true;
+            }
+
             Log("Launching installed Groovy core...");
             await deployer.LaunchExistingAsync(config, Log);
             return await WaitForGroovyAfterLaunchAsync(config.Target);

@@ -56,8 +56,10 @@ namespace MiSTerCast
 
         public static string BuildInventoryCommand()
         {
-            return "mister=''; " +
-                "for f in /media/fat/*; do [ -f \"$f\" ] || continue; n=$(basename \"$f\" | tr '[:upper:]' '[:lower:]'); if [ \"$n\" = 'mister_groovy' ]; then mister=\"$f\"; break; fi; done; " +
+            return "main=''; " +
+                "if [ -f /media/fat/MiSTer.ini ]; then main=$(awk 'BEGIN{in_g=0} /^\\[Groovy\\]/{in_g=1;next} /^\\[.*\\]/{in_g=0} in_g&&/^main=/{print substr($0,6); exit}' /media/fat/MiSTer.ini); fi; " +
+                "mister=''; " +
+                "if [ -n \"$main\" ] && [ -f \"/media/fat/$main\" ]; then mister=\"/media/fat/$main\"; else for f in /media/fat/*; do [ -f \"$f\" ] || continue; n=$(basename \"$f\" | tr '[:upper:]' '[:lower:]'); if [ \"$n\" = 'mister_groovy' ]; then mister=\"$f\"; break; fi; done; fi; " +
                 "rbf=''; " +
                 "for f in /media/fat/_Utility/*; do [ -f \"$f\" ] || continue; n=$(basename \"$f\" | tr '[:upper:]' '[:lower:]'); case \"$n\" in groovy*.rbf) rbf=\"$f\"; break;; esac; done; " +
                 "printf 'MISTER=%s\nRBF=%s\n' \"$mister\" \"$rbf\"";

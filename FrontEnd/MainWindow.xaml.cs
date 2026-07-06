@@ -166,20 +166,23 @@ namespace MiSTerCast
                 if (isInitialized)
                 {
                     EnablePreviewCheckBox.IsChecked = false;
+                    string target = TargetIpAddresTextBox.Text.Trim();
                     IPAddress ipAddress = null;
-                    if (!IPAddress.TryParse(TargetIpAddresTextBox.Text, out ipAddress))
+                    bool targetWasHostname = !IPAddress.TryParse(target, out ipAddress);
+                    if (targetWasHostname)
                     {
                         try
                         {
-                            var hostEntry = Dns.GetHostEntry(TargetIpAddresTextBox.Text);
+                            var hostEntry = Dns.GetHostEntry(target);
                             if (hostEntry.AddressList == null || hostEntry.AddressList.Length == 0)
                             {
-                                Log("No IP addresses found for hostname: " + TargetIpAddresTextBox.Text, true);
+                                Log("No IP addresses found for hostname: " + target, true);
                                 return;
                             }
                             // Prefer IPv4 addresses
                             ipAddress = hostEntry.AddressList.FirstOrDefault(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
                                 ?? hostEntry.AddressList[0];
+                            Log("Resolved target " + target + " to " + ipAddress + ".");
                         }
                         catch (Exception exception)
                         {
@@ -194,6 +197,10 @@ namespace MiSTerCast
                         ToggleStreamButton.Content = "Stop Stream";
                         CaptureSourceBox.IsEnabled = false;
                         EnableAudioCheckBox.IsEnabled = false;
+                    }
+                    else if (targetWasHostname)
+                    {
+                        Log("Start stream failed for " + target + " (" + ipAddress + "). If multiple MiSTers share this hostname, use the target IP address.", true);
                     }
                 }
             }

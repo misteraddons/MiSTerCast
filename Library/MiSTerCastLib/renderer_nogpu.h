@@ -68,6 +68,7 @@ public:
 
     ~renderer_nogpu();
     int create();
+    bool initialize();
     void draw();
     void save() {}
     void record() {}
@@ -123,11 +124,37 @@ int renderer_nogpu::create()
 }
 
 //============================================================
+//  renderer_nogpu::initialize
+//============================================================
+
+bool renderer_nogpu::initialize()
+{
+    if (m_initialized)
+        return true;
+
+    m_initialized = nogpu_init();
+    if (m_initialized)
+    {
+        LogMessage("Done.");
+        nogpu_switch_video_mode();
+    }
+    else
+    {
+        m_first_blit = false;
+    }
+
+    return m_initialized;
+}
+
+//============================================================
 //  renderer_nogpu::~renderer_nogpu
 //============================================================
 
 renderer_nogpu::~renderer_nogpu()
 {
+    if (!m_initialized)
+        return;
+
     // Wait for fpga to flush last blit
     SleepTicks(uint64_t(m_period * time_sleep));
 
@@ -166,18 +193,7 @@ void renderer_nogpu::draw()
 
     // initialize nogpu right before first blit
     if (m_first_blit && !m_initialized)
-    {
-        m_initialized = nogpu_init();
-        if (m_initialized)
-        {
-            LogMessage("Done.");
-            nogpu_switch_video_mode();
-        }
-        else
-        {
-            m_first_blit = false;
-        }
-    }
+        initialize();
 
     // only send frame if nogpu is initialized
     if (!m_initialized)
@@ -355,22 +371,29 @@ bool renderer_nogpu::nogpu_init()
         LogMessage("Unsupported audio sample rate. Only 48kHz, 44.1kHz and 22.05kHz are supported.");
     }
 
-    LogMessage("Sending CMD_INIT...");
-
     // Reset current mode
     m_current_mode = {};
 
-    int ret = groovyMister.CmdInit(m_targetip.c_str(), UDP_PORT, m_compression, audioSampleRate, 2, 0, 1500);
-    if (ret == 0)
+    const int maxAttempts = 8;
+    for (int attempt = 1; attempt <= maxAttempts; attempt++)
     {
-        audioBuffer = (uint16_t*)groovyMister.getPBufferAudio();
-        return true;
+        if (attempt == 1)
+            LogMessage("Sending CMD_INIT...");
+        else
+            LogMessage("Retrying CMD_INIT (" + std::to_string(attempt) + "/" + std::to_string(maxAttempts) + ")...");
+
+        int ret = groovyMister.CmdInit(m_targetip.c_str(), UDP_PORT, m_compression, audioSampleRate, 2, 0, 1500);
+        if (ret == 0)
+        {
+            audioBuffer = (uint16_t*)groovyMister.getPBufferAudio();
+            return true;
+        }
+
+        Sleep(250);
     }
-    else
-    {
-        LogMessage("Groovy MiSTer API failed to initialize!");
-        return false;
-    }
+
+    LogMessage("Groovy MiSTer API failed to initialize. No UDP ACK from target.", true);
+    return false;
 }
 
 //============================================================

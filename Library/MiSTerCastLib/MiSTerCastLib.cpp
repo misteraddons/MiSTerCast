@@ -34,6 +34,21 @@ void capture_screen()
 }
 
 std::atomic_bool casting_screen = false;
+std::mutex castStartMutex;
+std::condition_variable castStartCondition;
+bool castStartReady = false;
+bool castStartSucceeded = false;
+
+void SignalCastStart(bool succeeded)
+{
+    {
+        std::lock_guard<std::mutex> lock(castStartMutex);
+        castStartSucceeded = succeeded;
+        castStartReady = true;
+    }
+    castStartCondition.notify_one();
+}
+
 void cast_screen()
 {
     if (!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST))
@@ -51,6 +66,22 @@ void cast_screen()
     casting_screen = true;
     {
         auto renderer = std::make_unique<renderer_nogpu>(targetIpString);
+        if (!renderer->initialize())
+        {
+            casting_screen = false;
+            SignalCastStart(false);
+            LogMessage("Casting to MiSTer stopped.");
+
+            if (source_config.audio)
+            {
+                StopAudioCapture();
+                LogMessage("Audio capture stopped.");
+            }
+
+            return;
+        }
+
+        SignalCastStart(true);
         {
             while (!stopStream)
             {
@@ -122,10 +153,13 @@ MISTERCASTLIB_API bool Initialize(log_function fnLog, capture_image_function fnC
 
 MISTERCASTLIB_API bool Shutdown()
 {
+    StopStream();
+
     stopCapture = true;
 
     if (captureScreenTask && captureScreenTask->joinable())
         captureScreenTask->join();
+    captureScreenTask.reset();
     stopCapture = false;
 
     CleanupVideoCapture();
@@ -141,7 +175,36 @@ MISTERCASTLIB_API bool StartStream(const char* targetIp)
 {
     LogMessage("Starting stream.");
     targetIpString = std::string(targetIp);
+
+    if (castScreenTask && castScreenTask->joinable())
+    {
+        LogMessage("Stream is already running.", true);
+        return false;
+    }
+
+    stopStream = false;
+    {
+        std::lock_guard<std::mutex> lock(castStartMutex);
+        castStartReady = false;
+        castStartSucceeded = false;
+    }
+
     castScreenTask = std::make_unique<std::thread>(cast_screen);
+
+    {
+        std::unique_lock<std::mutex> lock(castStartMutex);
+        castStartCondition.wait(lock, [] { return castStartReady; });
+    }
+
+    if (!castStartSucceeded)
+    {
+        stopStream = true;
+        if (castScreenTask && castScreenTask->joinable())
+            castScreenTask->join();
+        castScreenTask.reset();
+        stopStream = false;
+        return false;
+    }
 
     return true;
 }
@@ -152,6 +215,7 @@ MISTERCASTLIB_API bool StopStream()
 
     if (castScreenTask && castScreenTask->joinable())
         castScreenTask->join();
+    castScreenTask.reset();
     stopStream = false;
     return true;
 }

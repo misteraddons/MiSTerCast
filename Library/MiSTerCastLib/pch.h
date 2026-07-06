@@ -24,6 +24,8 @@
 #include <algorithm>
 #include <thread>
 #include <atomic>
+#include <condition_variable>
+#include <mutex>
 
 #include <MMDeviceAPI.h>
 #include <AudioClient.h>
